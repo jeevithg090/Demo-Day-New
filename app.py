@@ -237,7 +237,7 @@ def load_llm_model():
     # Google GenAI configuration
     from google import genai
     
-    api_key = "AIzaSyBn-l2uzKf1cZTXqznSA18r2SsbwMKwt5s"
+    api_key = ""
     client = genai.Client(api_key=api_key)
     
     logger.info(f"Google GenAI configured in {time.time() - start:.2f}s")
