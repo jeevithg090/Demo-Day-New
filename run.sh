@@ -1,102 +1,46 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# Local development launcher: creates a venv, installs deps, starts Redis if
+# available, seeds sample data and runs the server with auto-reload.
+set -euo pipefail
+cd "$(dirname "$0")"
 
-# Apollo Hospital Voice AI Assistant v2.0
-# Startup script with Redis and seed data support
+PORT="${PORT:-8000}"
 
-set -e
-
-echo "=========================================="
-echo "  Apollo Hospital Voice AI Assistant"
-echo "  v2.0 - Hackathon Demo"
-echo "=========================================="
-echo ""
-
-# Check if HF_TOKEN is set
-if [ -z "$HF_TOKEN" ]; then
-    echo "WARNING: HF_TOKEN environment variable not set."
-    echo "You may need to set it for LLaMA model access:"
-    echo "  export HF_TOKEN=your_huggingface_token"
-    echo ""
+if [ ! -d venv ]; then
+  echo "Creating virtual environment..."
+  python3 -m venv venv
 fi
-
-# Check Python version
-python_version=$(python3 --version 2>&1)
-echo "Python version: $python_version"
-
-# Check if virtual environment exists
-if [ ! -d "venv" ]; then
-    echo ""
-    echo "Creating virtual environment..."
-    python3 -m venv venv
-fi
-
-# Activate virtual environment
-echo "Activating virtual environment..."
+# shellcheck disable=SC1091
 source venv/bin/activate
 
-# Install dependencies
-echo ""
 echo "Installing dependencies..."
-pip install --upgrade pip
-pip install -r requirements.txt
+pip install --quiet --upgrade pip
+pip install --quiet -r requirements.txt
 
-# Check GPU availability
-echo ""
-python3 -c "import torch; print(f'CUDA available: {torch.cuda.is_available()}'); print(f'Device: {\"GPU - \" + torch.cuda.get_device_name(0) if torch.cuda.is_available() else \"CPU\"}')"
+if [ ! -f .env ] && [ -z "${GEMINI_API_KEY:-}" ]; then
+  echo "WARNING: GEMINI_API_KEY not set (copy .env.example to .env). LLM replies will use a fallback message."
+fi
 
-# Check Redis
-echo ""
-echo "Checking Redis..."
-if command -v redis-cli &> /dev/null; then
-    if redis-cli ping &> /dev/null; then
-        echo "Redis is running!"
-        REDIS_CONNECTED=true
-    else
-        echo "Redis is installed but not running."
-        echo "Starting Redis..."
-        if command -v redis-server &> /dev/null; then
-            redis-server --daemonize yes
-            sleep 1
-            if redis-cli ping &> /dev/null; then
-                echo "Redis started successfully!"
-                REDIS_CONNECTED=true
-            else
-                echo "WARNING: Could not start Redis. Using in-memory fallback."
-                REDIS_CONNECTED=false
-            fi
-        else
-            echo "WARNING: Redis server not found. Using in-memory fallback."
-            REDIS_CONNECTED=false
-        fi
-    fi
+python3 -c "import torch; print('CUDA available:', torch.cuda.is_available())"
+
+if command -v redis-cli >/dev/null 2>&1; then
+  if ! redis-cli ping >/dev/null 2>&1 && command -v redis-server >/dev/null 2>&1; then
+    echo "Starting Redis..."
+    redis-server --daemonize yes
+    sleep 1
+  fi
+  if redis-cli ping >/dev/null 2>&1; then
+    echo "Seeding hospital data into Redis..."
+    python3 scripts/seed_data.py --clear || echo "Seeding failed; continuing."
+  fi
 else
-    echo "WARNING: Redis not installed. Using in-memory fallback."
-    echo "To install Redis:"
-    echo "  macOS: brew install redis"
-    echo "  Ubuntu: sudo apt install redis-server"
-    REDIS_CONNECTED=false
-fi
-
-# Seed data if Redis is connected
-if [ "$REDIS_CONNECTED" = true ]; then
-    echo ""
-    echo "Seeding hospital data..."
-    python3 scripts/seed_data.py --clear 2>/dev/null || echo "Seed script not found or failed. Continuing..."
+  echo "Redis not installed; using in-memory sessions and data/sample_hospital.json."
 fi
 
 echo ""
-echo "=========================================="
-echo "  Starting server on http://localhost:8000"
-echo "=========================================="
+echo "  Main UI:  http://localhost:${PORT}"
+echo "  Admin:    http://localhost:${PORT}/admin"
+echo "  Health:   http://localhost:${PORT}/health"
+echo "  API docs: http://localhost:${PORT}/docs"
 echo ""
-echo "Endpoints:"
-echo "  - Main UI:    http://localhost:8000"
-echo "  - Admin:      http://localhost:8000/admin"
-echo "  - Health:     http://localhost:8000/health"
-echo "  - API Docs:   http://localhost:8000/docs"
-echo ""
-echo "Press Ctrl+C to stop the server"
-echo ""
-
-# Start the server
-python3 -m uvicorn app:app --host 0.0.0.0 --port 8000 --reload
+exec python3 -m uvicorn app:app --host 0.0.0.0 --port "$PORT" --reload
