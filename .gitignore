@@ -1,47 +1,49 @@
 # Python
 __pycache__/
 *.py[cod]
-*$py.class
-*.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
 *.egg-info/
-.installed.cfg
-*.egg
+.eggs/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
 
-# Virtual Environment
+# Virtual environments
 venv/
+.venv/
 env/
 ENV/
 
-# IDE
+# Environment variables - DO NOT COMMIT
+.env
+.env.*
+!.env.example
+
+# Downloaded models and generated audio
+piper_voices/*.onnx
+piper_voices/*.onnx.json
+!piper_voices/.gitkeep
+*.wav
+*.mp3
+*.weba
+*.webm
+
+# Redis
+dump.rdb
+
+# IDE / OS
 .vscode/
 .idea/
 *.swp
 *.swo
-
-# OS
 .DS_Store
 Thumbs.db
-
-# Environment variables - DO NOT COMMIT
-.env
-.env.local
-.env.*.local
 
 # Logs
 *.log
 
-# Jupyter Notebook checkpoints
-.ipynb_checkpoints
+# Jupyter
+.ipynb_checkpoints/
