@@ -1,38 +1,33 @@
-# Apollo Hospital Voice AI Assistant v2.0
-# Requirements for the web demo
+# Apollo Hospital Voice AI Assistant - runtime dependencies
+# Install: pip install -r requirements.txt
 
-# FastAPI and server
-fastapi==0.109.0
-uvicorn[standard]==0.27.0
-python-multipart==0.0.6
-pydantic>=2.0.0
+# Web server
+fastapi>=0.115,<1
+uvicorn[standard]>=0.30
+python-multipart>=0.0.18
+pydantic>=2.7,<3
 
 # Audio processing
-soundfile==0.12.1
-librosa==0.10.1
-numpy>=1.24.0
+soundfile>=0.12.1
+librosa>=0.10.1
+numpy>=1.26
 
-# Voice Activity Detection
-torch>=2.1.0
-torchaudio>=2.1.0
+# Voice activity detection (Silero; the package bundles the model weights)
+torch>=2.2
+torchaudio>=2.2
+silero-vad>=5.1
 
-# Speech-to-Text (Faster-Whisper)
-faster-whisper>=1.0.0
-ctranslate2>=4.0.0
+# Speech-to-text (also provides PyAV for WebM/Opus decoding)
+faster-whisper>=1.0.3
 
-# LLM (LLaMA with quantization)
-transformers==4.46.1
-accelerate>=0.25.0
-bitsandbytes>=0.42.0
+# LLM
+google-genai>=1.0
 
-# Text-to-Speech (Indic Parler-TTS)
-parler-tts>=0.2.0
+# Text-to-speech
+edge-tts>=6.1.12
+piper-tts>=1.2  # optional local Hindi/Telugu voices
 
-# Utilities
-huggingface-hub>=0.20.0
-tokenizers>=0.15.0
-
-# v2.0 - Session management and RAG
-redis>=5.0.0
-sentence-transformers>=2.2.0
-faiss-cpu>=1.7.4
+# Sessions, admin data and RAG
+redis>=5.0
+sentence-transformers>=3.0
+faiss-cpu>=1.8
