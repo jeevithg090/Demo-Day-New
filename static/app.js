@@ -83,6 +83,8 @@ async function checkServerHealth() {
             console.log('Server status:', data);
             console.log('Redis connected:', data.redis_connected);
             console.log('RAG ready:', data.rag_ready);
+        } else if (data.status === 'error') {
+            updateStatus('error', 'Model loading failed - check server logs');
         } else {
             updateStatus('loading', 'Loading models...');
             // Poll until ready
@@ -402,7 +404,7 @@ async function processAudio(audioBlob) {
 
             handleSuccessResponse(data);
         } else {
-            showError(data.error || 'Processing failed');
+            showError(data.error || (typeof data.detail === 'string' ? data.detail : null) || 'Processing failed');
         }
 
     } catch (error) {
@@ -471,7 +473,7 @@ function handleSuccessResponse(data) {
 
     // Play audio response
     if (data.audio_response) {
-        playAudioResponse(data.audio_response);
+        playAudioResponse(data.audio_response, data.audio_format);
     }
 
     // Update signals
@@ -532,8 +534,10 @@ function addToConversation(role, text, language) {
     elements.conversationContainer.scrollTop = elements.conversationContainer.scrollHeight;
 }
 
-function playAudioResponse(base64Audio) {
-    const audioBlob = base64ToBlob(base64Audio, 'audio/wav');
+const AUDIO_MIME_TYPES = { mp3: 'audio/mpeg', wav: 'audio/wav' };
+
+function playAudioResponse(base64Audio, format = 'mp3') {
+    const audioBlob = base64ToBlob(base64Audio, AUDIO_MIME_TYPES[format] || 'audio/mpeg');
     const audioUrl = URL.createObjectURL(audioBlob);
 
     if (elements.responseAudio) {
@@ -541,7 +545,10 @@ function playAudioResponse(base64Audio) {
         if (elements.audioPlayerSection) {
             elements.audioPlayerSection.hidden = false;
         }
-        elements.responseAudio.play();
+        elements.responseAudio.play().catch((err) => {
+            // Autoplay can be blocked by the browser; the player stays visible for manual playback.
+            console.warn('Audio autoplay blocked:', err);
+        });
     }
 }
 
@@ -863,8 +870,9 @@ class CallManager {
             }
         } else if (msg.type === 'latency') {
             this.latencyText.textContent = `Latency: ${msg.value}ms`;
-        } else if (msg.type === 'transcript') {
-            // Optional: Show transcript toast
+        } else if (msg.type === 'error') {
+            this.statusText.textContent = msg.message || 'Something went wrong';
+            this.statusText.style.color = 'var(--error-red)';
         }
     }
 

@@ -4,7 +4,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Multilingual voice assistant for hospital patient queries in Kannada, Tamil, Telugu, Hindi and English.">
+    <meta name="theme-color" content="#1a56db">
     <title>Apollo Hospital - Voice AI Assistant</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Ccircle cx='20' cy='20' r='18' fill='%231a56db'/%3E%3Cpath d='M20 8v24M12 20h16' stroke='%23fff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="stylesheet" href="/static/styles.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
@@ -15,7 +19,7 @@
         <header class="header">
             <div class="logo-section">
                 <div class="apollo-logo">
-                    <svg viewBox="0 0 40 40" class="logo-icon">
+                    <svg viewBox="0 0 40 40" class="logo-icon" aria-hidden="true">
                         <circle cx="20" cy="20" r="18" fill="#1a56db" stroke="#fff" stroke-width="2" />
                         <path d="M20 8 L20 32 M12 20 L28 20" stroke="#fff" stroke-width="3" stroke-linecap="round" />
                     </svg>
@@ -25,14 +29,14 @@
                     </div>
                 </div>
             </div>
-            <div class="status-indicator" id="statusIndicator">
+            <div class="status-indicator" id="statusIndicator" role="status" aria-live="polite">
                 <span class="status-dot"></span>
                 <span class="status-text">Connecting...</span>
             </div>
         </header>
 
         <!-- Navigation -->
-        <nav class="nav-bar">
+        <nav class="nav-bar" aria-label="Mode">
             <button class="nav-tab active" data-tab="legacy">Ask (Legacy)</button>
             <button class="nav-tab" data-tab="aicall">AI Call (Live)</button>
         </nav>
@@ -318,10 +322,12 @@
 
                     <div class="call-controls">
                         <div class="language-selector-call">
-                            <select id="callLanguageSelect">
+                            <select id="callLanguageSelect" aria-label="Call language">
                                 <option value="en">English</option>
                                 <option value="hi">Hindi</option>
                                 <option value="te">Telugu</option>
+                                <option value="kn">Kannada</option>
+                                <option value="ta">Tamil</option>
                             </select>
                         </div>
                         <button id="startCallBtn" class="call-btn start">

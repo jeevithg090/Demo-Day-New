@@ -75,7 +75,7 @@ function setupFormHandlers() {
 
 async function loadSettings() {
     try {
-        const response = await fetch('/api/admin/config');
+        const response = await adminFetch('/api/admin/config');
         if (response.ok) {
             state.config = await response.json();
             populateSettingsForm(state.config);
@@ -131,7 +131,7 @@ async function saveSettings(e) {
     };
     
     try {
-        const response = await fetch('/api/admin/config', {
+        const response = await adminFetch('/api/admin/config', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(config)
@@ -156,7 +156,7 @@ async function saveEscalation(e) {
     const keywords = keywordsText.split('\n').map(k => k.trim()).filter(k => k);
     
     try {
-        const response = await fetch('/api/admin/config', {
+        const response = await adminFetch('/api/admin/config', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -183,9 +183,9 @@ async function saveEscalation(e) {
 
 async function loadDoctors() {
     try {
-        const response = await fetch('/api/admin/doctors');
+        const response = await adminFetch('/api/admin/doctors');
         if (response.ok) {
-            state.doctors = await response.json();
+            state.doctors = (await response.json()).doctors || [];
             renderDoctorsTable();
         }
     } catch (error) {
@@ -206,19 +206,19 @@ function renderDoctorsTable() {
     emptyState.style.display = 'none';
     tbody.innerHTML = state.doctors.map(doc => `
         <tr>
-            <td>${doc.name}${doc.name_kn ? ` <span class="lang-badge">${doc.name_kn}</span>` : ''}</td>
-            <td>${doc.specialization || '-'}</td>
-            <td>${doc.department || '-'}</td>
-            <td>${Array.isArray(doc.available_days) ? doc.available_days.join(', ') : doc.available_days || '-'}</td>
-            <td>${doc.timings || '-'}</td>
+            <td>${escapeHtml(doc.name)}${doc.name_kn ? ` <span class="lang-badge">${escapeHtml(doc.name_kn)}</span>` : ''}</td>
+            <td>${escapeHtml(doc.specialization || '-')}</td>
+            <td>${escapeHtml(doc.department || '-')}</td>
+            <td>${escapeHtml(Array.isArray(doc.available_days) ? doc.available_days.join(', ') : doc.available_days || '-')}</td>
+            <td>${escapeHtml(doc.timings || '-')}</td>
             <td class="actions">
-                <button class="btn-icon" onclick="editDoctor('${doc.id}')" title="Edit">
+                <button class="btn-icon" onclick="editDoctor('${escapeHtml(doc.id)}')" title="Edit" aria-label="Edit">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
                         <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
                     </svg>
                 </button>
-                <button class="btn-icon btn-danger" onclick="deleteDoctor('${doc.id}')" title="Delete">
+                <button class="btn-icon btn-danger" onclick="deleteDoctor('${escapeHtml(doc.id)}')" title="Delete" aria-label="Delete">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <polyline points="3 6 5 6 21 6"/>
                         <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
@@ -288,13 +288,13 @@ async function saveDoctor(e) {
     try {
         let response;
         if (id) {
-            response = await fetch(`/api/admin/doctors/${id}`, {
+            response = await adminFetch(`/api/admin/doctors/${id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(doctor)
             });
         } else {
-            response = await fetch('/api/admin/doctors', {
+            response = await adminFetch('/api/admin/doctors', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(doctor)
@@ -318,7 +318,7 @@ async function deleteDoctor(id) {
     if (!confirm('Are you sure you want to delete this doctor?')) return;
     
     try {
-        const response = await fetch(`/api/admin/doctors/${id}`, {
+        const response = await adminFetch(`/api/admin/doctors/${id}`, {
             method: 'DELETE'
         });
         
@@ -340,9 +340,9 @@ async function deleteDoctor(id) {
 
 async function loadDepartments() {
     try {
-        const response = await fetch('/api/admin/departments');
+        const response = await adminFetch('/api/admin/departments');
         if (response.ok) {
-            state.departments = await response.json();
+            state.departments = (await response.json()).departments || [];
             renderDepartmentsTable();
         }
     } catch (error) {
@@ -363,12 +363,12 @@ function renderDepartmentsTable() {
     emptyState.style.display = 'none';
     tbody.innerHTML = state.departments.map(dept => `
         <tr>
-            <td>${dept.name}</td>
-            <td>${dept.floor || '-'}</td>
-            <td>${dept.timings || '-'}</td>
-            <td>${dept.contact || '-'}</td>
+            <td>${escapeHtml(dept.name)}</td>
+            <td>${escapeHtml(dept.floor || '-')}</td>
+            <td>${escapeHtml(dept.timings || '-')}</td>
+            <td>${escapeHtml(dept.contact || '-')}</td>
             <td class="actions">
-                <button class="btn-icon btn-danger" onclick="deleteDepartment('${dept.id}')" title="Delete">
+                <button class="btn-icon btn-danger" onclick="deleteDepartment('${escapeHtml(dept.id)}')" title="Delete" aria-label="Delete">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <polyline points="3 6 5 6 21 6"/>
                         <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
@@ -400,7 +400,7 @@ async function saveDepartment(e) {
     };
     
     try {
-        const response = await fetch('/api/admin/departments', {
+        const response = await adminFetch('/api/admin/departments', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(department)
@@ -423,7 +423,7 @@ async function deleteDepartment(id) {
     if (!confirm('Are you sure you want to delete this department?')) return;
     
     try {
-        const response = await fetch(`/api/admin/departments/${id}`, {
+        const response = await adminFetch(`/api/admin/departments/${id}`, {
             method: 'DELETE'
         });
         
@@ -445,9 +445,9 @@ async function deleteDepartment(id) {
 
 async function loadFaqs() {
     try {
-        const response = await fetch('/api/admin/faqs');
+        const response = await adminFetch('/api/admin/faqs');
         if (response.ok) {
-            state.faqs = await response.json();
+            state.faqs = (await response.json()).faqs || [];
             renderFaqsTable();
         }
     } catch (error) {
@@ -468,17 +468,17 @@ function renderFaqsTable() {
     emptyState.style.display = 'none';
     tbody.innerHTML = state.faqs.map(faq => `
         <tr>
-            <td>${truncate(faq.question, 50)}</td>
-            <td>${truncate(faq.answer, 80)}</td>
-            <td><span class="category-badge">${faq.category || 'general'}</span></td>
+            <td>${escapeHtml(truncate(faq.question, 50))}</td>
+            <td>${escapeHtml(truncate(faq.answer, 80))}</td>
+            <td><span class="category-badge">${escapeHtml(faq.category || 'general')}</span></td>
             <td class="actions">
-                <button class="btn-icon" onclick="editFaq('${faq.id}')" title="Edit">
+                <button class="btn-icon" onclick="editFaq('${escapeHtml(faq.id)}')" title="Edit" aria-label="Edit">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
                         <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
                     </svg>
                 </button>
-                <button class="btn-icon btn-danger" onclick="deleteFaq('${faq.id}')" title="Delete">
+                <button class="btn-icon btn-danger" onclick="deleteFaq('${escapeHtml(faq.id)}')" title="Delete" aria-label="Delete">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <polyline points="3 6 5 6 21 6"/>
                         <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
@@ -536,13 +536,13 @@ async function saveFaq(e) {
     try {
         let response;
         if (id) {
-            response = await fetch(`/api/admin/faqs/${id}`, {
+            response = await adminFetch(`/api/admin/faqs/${id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(faq)
             });
         } else {
-            response = await fetch('/api/admin/faqs', {
+            response = await adminFetch('/api/admin/faqs', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(faq)
@@ -566,7 +566,7 @@ async function deleteFaq(id) {
     if (!confirm('Are you sure you want to delete this FAQ?')) return;
     
     try {
-        const response = await fetch(`/api/admin/faqs/${id}`, {
+        const response = await adminFetch(`/api/admin/faqs/${id}`, {
             method: 'DELETE'
         });
         
@@ -585,6 +585,57 @@ async function deleteFaq(id) {
 // ============================================================================
 // UTILITIES
 // ============================================================================
+
+const ADMIN_TOKEN_KEY = 'apollo_admin_token';
+
+/** Escape a value for safe interpolation into HTML. */
+function escapeHtml(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function getAdminToken() {
+    try {
+        return sessionStorage.getItem(ADMIN_TOKEN_KEY) || '';
+    } catch {
+        return '';
+    }
+}
+
+function setAdminToken(token) {
+    try {
+        if (token) sessionStorage.setItem(ADMIN_TOKEN_KEY, token);
+        else sessionStorage.removeItem(ADMIN_TOKEN_KEY);
+    } catch {
+        /* storage unavailable: token lives only for this request */
+    }
+}
+
+/**
+ * fetch() wrapper for the admin API. Sends the admin bearer token (if the
+ * server requires one) and asks for it once when the server answers 401.
+ */
+async function adminFetch(url, options = {}, retried = false) {
+    const headers = { ...(options.headers || {}) };
+    const token = getAdminToken();
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const response = await fetch(url, { ...options, headers });
+    if (response.status === 401 && !retried) {
+        const entered = window.prompt('Enter the admin token (ADMIN_TOKEN) to make changes:');
+        if (entered) {
+            setAdminToken(entered.trim());
+            return adminFetch(url, options, true);
+        }
+    } else if (response.status === 401) {
+        setAdminToken('');
+    }
+    return response;
+}
 
 function closeModal(modalId) {
     document.getElementById(modalId).classList.remove('active');
