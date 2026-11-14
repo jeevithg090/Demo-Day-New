@@ -4,359 +4,253 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Multilingual voice assistant for hospital patient queries in Kannada, Tamil, Telugu, Hindi and English.">
+    <title>Apollo Voice AI Assistant</title>
+    <meta name="description" content="Speak to a multilingual hospital voice assistant in Kannada, Tamil, Telugu, Hindi or English. It transcribes, answers aloud and flags emergencies.">
     <meta name="theme-color" content="#1a56db">
-    <title>Apollo Hospital - Voice AI Assistant</title>
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Ccircle cx='20' cy='20' r='18' fill='%231a56db'/%3E%3Cpath d='M20 8v24M12 20h16' stroke='%23fff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Apollo Voice AI">
+    <meta property="og:title" content="Apollo Voice AI Assistant">
+    <meta property="og:description" content="A real-time voice assistant for hospital patient queries in five Indian languages.">
+    <meta name="twitter:card" content="summary">
+    <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
     <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+    <link rel="stylesheet" href="/static/base.css">
     <link rel="stylesheet" href="/static/styles.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="/static/ui.js"></script>
 </head>
 
 <body>
-    <div class="container">
-        <!-- Header -->
-        <header class="header">
-            <div class="logo-section">
-                <div class="apollo-logo">
-                    <svg viewBox="0 0 40 40" class="logo-icon" aria-hidden="true">
-                        <circle cx="20" cy="20" r="18" fill="#1a56db" stroke="#fff" stroke-width="2" />
-                        <path d="M20 8 L20 32 M12 20 L28 20" stroke="#fff" stroke-width="3" stroke-linecap="round" />
-                    </svg>
-                    <div class="logo-text">
-                        <h1>Apollo Hospital</h1>
-                        <span class="tagline">Voice AI Assistant</span>
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <header class="app-header">
+        <div class="app-header-inner">
+            <a class="brand" href="/" aria-label="Apollo Voice AI home">
+                <img src="/static/favicon.svg" alt="" class="brand-mark" width="36" height="36">
+                <span class="brand-text">
+                    <span class="brand-name">Apollo Hospital</span>
+                    <span class="brand-sub">Voice AI Assistant</span>
+                </span>
+            </a>
+            <div class="header-actions">
+                <div class="status-pill" id="statusIndicator" data-state="loading" role="status" aria-live="polite">
+                    <span class="status-dot" aria-hidden="true"></span>
+                    <span class="status-text">Connecting…</span>
+                </div>
+                <a class="btn btn-ghost btn-sm header-link" href="/admin">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                    <span class="header-link-text">Admin</span>
+                </a>
+                <button type="button" class="btn-icon theme-toggle" aria-label="Switch theme">
+                    <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                    <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main id="main" class="page" tabindex="-1">
+        <div class="page-intro">
+            <h1>How can we help you today?</h1>
+            <p>Ask a health or hospital question by voice in Kannada, Tamil, Telugu, Hindi or English. Replies are spoken back in your language.</p>
+        </div>
+
+        <div class="alert alert-warning" id="serviceNotice" role="status" hidden>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>
+            <div>
+                <strong id="serviceNoticeTitle">Speech models are loading</strong>
+                <p id="serviceNoticeText">Recording is available once the server has finished loading. This page updates automatically.</p>
+            </div>
+        </div>
+
+        <!-- Mode tabs -->
+        <div class="tabs" role="tablist" aria-label="Assistant mode">
+            <button type="button" class="tab" role="tab" id="tab-ask" aria-controls="panel-ask" aria-selected="true" data-tab="ask">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8"/></svg>
+                Ask
+            </button>
+            <button type="button" class="tab" role="tab" id="tab-call" aria-controls="panel-call" aria-selected="false" tabindex="-1" data-tab="call">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                Live call
+            </button>
+        </div>
+
+        <!-- ============================== ASK ============================== -->
+        <section id="panel-ask" class="tab-panel" role="tabpanel" aria-labelledby="tab-ask">
+            <div class="ask-grid">
+                <!-- Input -->
+                <div class="card input-card">
+                    <div class="card-header">
+                        <h2 class="card-title">Your question</h2>
+                    </div>
+                    <div class="card-body input-body">
+                        <div class="input-options">
+                            <div class="field">
+                                <label for="languageSelect">Language</label>
+                                <select id="languageSelect" class="select" aria-describedby="languageHint">
+                                    <option value="en">English</option>
+                                    <option value="kn">Kannada · ಕನ್ನಡ</option>
+                                    <option value="ta">Tamil · தமிழ்</option>
+                                    <option value="te">Telugu · తెలుగు</option>
+                                    <option value="hi">Hindi · हिन्दी</option>
+                                </select>
+                                <span class="field-hint" id="languageHint">The language you will speak in.</span>
+                            </div>
+                            <label class="switch tts-switch">
+                                <input type="checkbox" id="ttsToggle" aria-describedby="ttsHint">
+                                <span class="switch-track" aria-hidden="true"></span>
+                                <span>
+                                    Fast local voice
+                                    <span class="field-hint" id="ttsHint">Piper TTS · English, Hindi, Telugu</span>
+                                </span>
+                            </label>
+                        </div>
+
+                        <div class="mic-area">
+                            <button type="button" id="micButton" class="mic-button" aria-describedby="micHint" disabled>
+                                <span class="mic-ring" aria-hidden="true"></span>
+                                <svg class="mic-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8"/></svg>
+                                <span class="mic-spinner" aria-hidden="true"></span>
+                                <span class="visually-hidden" id="micLabel">Hold to record</span>
+                            </button>
+                            <p class="mic-hint" id="micHint" aria-live="polite">Waiting for the server…</p>
+                        </div>
+
+                        <div class="divider" role="presentation"><span>or</span></div>
+
+                        <div class="upload-area">
+                            <input type="file" id="audioUpload" accept="audio/*" class="visually-hidden" tabindex="-1" aria-hidden="true">
+                            <button type="button" id="uploadButton" class="btn btn-secondary upload-button" disabled>
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+                                Upload an audio file
+                            </button>
+                            <span id="fileName" class="field-hint file-name">WAV, WebM, MP3 or OGG · up to 10 MB</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Conversation -->
+                <div class="card conversation-card">
+                    <div class="card-header">
+                        <h2 class="card-title">Conversation</h2>
+                        <button type="button" class="btn btn-ghost btn-sm" id="newSessionBtn" disabled>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+                            New conversation
+                        </button>
+                    </div>
+
+                    <div class="escalation-alert" id="escalationAlert" role="alert" hidden>
+                        <div class="alert-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>
+                        </div>
+                        <div class="alert-content">
+                            <h3>Possible medical emergency</h3>
+                            <p id="escalationReason"></p>
+                            <a class="btn btn-danger btn-sm" id="emergencyCall" href="tel:108">Call emergency: <span id="emergencyNumber">108</span></a>
+                        </div>
+                    </div>
+
+                    <div class="conversation" id="conversationContainer" aria-live="polite" aria-relevant="additions">
+                        <div class="state-block empty-state">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                            <h3>No messages yet</h3>
+                            <p>Hold the microphone and ask something like “What are the OPD timings?” or “I have had a fever for two days.”</p>
+                        </div>
+                    </div>
+
+                    <div class="audio-player" id="audioPlayerSection" hidden>
+                        <span class="field-label" id="audioLabel">Spoken reply</span>
+                        <audio id="responseAudio" controls aria-labelledby="audioLabel"></audio>
                     </div>
                 </div>
             </div>
-            <div class="status-indicator" id="statusIndicator" role="status" aria-live="polite">
-                <span class="status-dot"></span>
-                <span class="status-text">Connecting...</span>
-            </div>
-        </header>
 
-        <!-- Navigation -->
-        <nav class="nav-bar" aria-label="Mode">
-            <button class="nav-tab active" data-tab="legacy">Ask (Legacy)</button>
-            <button class="nav-tab" data-tab="aicall">AI Call (Live)</button>
-        </nav>
-
-        <!-- Main Content -->
-        <main class="main-content">
-            <!-- Legacy Interface -->
-            <div id="legacy-tab" class="tab-content active">
-                <!-- Controls Section -->
-                <div class="controls-section">
-                    <div class="language-section">
-                        <label for="languageSelect">Select Language:</label>
-                        <select id="languageSelect" class="language-select">
-                            <option value="en">English (Default)</option>
-                            <option value="kn">Kannada (ಕನ್ನಡ)</option>
-                            <option value="ta">Tamil (தமிழ்)</option>
-                            <option value="te">Telugu (తెలుగు)</option>
-                            <option value="hi">Hindi (हिन्दी)</option>
-                        </select>
-                    </div>
-
-                    <div class="tts-toggle-section">
-                        <label class="switch">
-                            <input type="checkbox" id="ttsToggle">
-                            <span class="slider round"></span>
-                        </label>
-                        <span class="toggle-label">Piper TTS (Fast)</span>
-                    </div>
-                </div>
-
-                <!-- Input Section -->
-                <div class="input-section">
-                    <div class="input-card">
-                        <h3>Speak Your Query</h3>
-                        <p class="input-description">Press and hold the microphone button to record your health query
-                        </p>
-
-                        <div class="mic-container">
-                            <button id="micButton" class="mic-button" aria-label="Record audio">
-                                <svg class="mic-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                    stroke-width="2">
-                                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-                                    <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                                    <line x1="12" y1="19" x2="12" y2="23" />
-                                    <line x1="8" y1="23" x2="16" y2="23" />
-                                </svg>
-                                <div class="pulse-ring"></div>
-                            </button>
-                            <div class="recording-indicator" id="recordingIndicator">
-                                <span class="recording-dot"></span>
-                                <span>Recording...</span>
-                            </div>
-                        </div>
-
-                        <div class="divider">
-                            <span>or</span>
-                        </div>
-
-                        <div class="upload-section">
-                            <input type="file" id="audioUpload" accept="audio/*" hidden>
-                            <button id="uploadButton" class="upload-button">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                                    <polyline points="17 8 12 3 7 8" />
-                                    <line x1="12" y1="3" x2="12" y2="15" />
-                                </svg>
-                                Upload Audio File
-                            </button>
-                            <span id="fileName" class="file-name"></span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Pipeline Visualization -->
-                <div class="pipeline-section" id="pipelineSection">
-                    <h3>Processing Pipeline</h3>
-                    <div class="pipeline-stages">
-                        <div class="stage" data-stage="vad">
-                            <div class="stage-icon">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-                                </svg>
-                            </div>
-                            <div class="stage-info">
-                                <span class="stage-name">VAD</span>
-                                <span class="stage-latency">--</span>
-                            </div>
-                            <div class="stage-status"></div>
-                        </div>
-                        <div class="stage-connector"></div>
-
-                        <div class="stage" data-stage="stt">
-                            <div class="stage-icon">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                                </svg>
-                            </div>
-                            <div class="stage-info">
-                                <span class="stage-name">STT</span>
-                                <span class="stage-latency">--</span>
-                            </div>
-                            <div class="stage-status"></div>
-                        </div>
-                        <div class="stage-connector"></div>
-
-                        <div class="stage" data-stage="language_detection">
-                            <div class="stage-icon">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <circle cx="12" cy="12" r="10" />
-                                    <line x1="2" y1="12" x2="22" y2="12" />
-                                    <path
-                                        d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-                                </svg>
-                            </div>
-                            <div class="stage-info">
-                                <span class="stage-name">Lang</span>
-                                <span class="stage-latency">--</span>
-                            </div>
-                            <div class="stage-status"></div>
-                        </div>
-                        <div class="stage-connector"></div>
-
-                        <div class="stage" data-stage="layer1_signals">
-                            <div class="stage-icon">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
-                                </svg>
-                            </div>
-                            <div class="stage-info">
-                                <span class="stage-name">Signals</span>
-                                <span class="stage-latency">--</span>
-                            </div>
-                            <div class="stage-status"></div>
-                        </div>
-                        <div class="stage-connector"></div>
-
-                        <div class="stage" data-stage="safety_gate">
-                            <div class="stage-icon">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                                </svg>
-                            </div>
-                            <div class="stage-info">
-                                <span class="stage-name">Safety</span>
-                                <span class="stage-latency">--</span>
-                            </div>
-                            <div class="stage-status"></div>
-                        </div>
-                        <div class="stage-connector"></div>
-
-                        <div class="stage" data-stage="policy">
-                            <div class="stage-icon">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                                    <polyline points="14 2 14 8 20 8" />
-                                </svg>
-                            </div>
-                            <div class="stage-info">
-                                <span class="stage-name">Policy</span>
-                                <span class="stage-latency">--</span>
-                            </div>
-                            <div class="stage-status"></div>
-                        </div>
-                        <div class="stage-connector"></div>
-
-                        <div class="stage" data-stage="llm">
-                            <div class="stage-icon">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
-                                    <line x1="8" y1="21" x2="16" y2="21" />
-                                    <line x1="12" y1="17" x2="12" y2="21" />
-                                </svg>
-                            </div>
-                            <div class="stage-info">
-                                <span class="stage-name">LLM</span>
-                                <span class="stage-latency">--</span>
-                            </div>
-                            <div class="stage-status"></div>
-                        </div>
-                        <div class="stage-connector"></div>
-
-                        <div class="stage" data-stage="tts">
-                            <div class="stage-icon">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-                                    <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
-                                </svg>
-                            </div>
-                            <div class="stage-info">
-                                <span class="stage-name">TTS</span>
-                                <span class="stage-latency">--</span>
-                            </div>
-                            <div class="stage-status"></div>
-                        </div>
-                    </div>
-
+            <!-- Pipeline -->
+            <div class="card pipeline-card" id="pipelineSection">
+                <div class="card-header">
+                    <h2 class="card-title">Processing pipeline</h2>
                     <div class="total-latency" id="totalLatency">
-                        <span class="latency-label">Total Latency:</span>
+                        <span class="latency-label">Total</span>
                         <span class="latency-value">--</span>
                     </div>
                 </div>
+                <div class="card-body">
+                    <ol class="pipeline-stages" aria-label="Pipeline stages and latency">
+                        <li class="stage" data-stage="vad"><span class="stage-dot" aria-hidden="true"></span><span class="stage-name">VAD</span><span class="stage-latency">--</span></li>
+                        <li class="stage" data-stage="stt"><span class="stage-dot" aria-hidden="true"></span><span class="stage-name">Speech to text</span><span class="stage-latency">--</span></li>
+                        <li class="stage" data-stage="language_detection"><span class="stage-dot" aria-hidden="true"></span><span class="stage-name">Language</span><span class="stage-latency">--</span></li>
+                        <li class="stage" data-stage="layer1_signals"><span class="stage-dot" aria-hidden="true"></span><span class="stage-name">Signals</span><span class="stage-latency">--</span></li>
+                        <li class="stage" data-stage="safety_gate"><span class="stage-dot" aria-hidden="true"></span><span class="stage-name">Safety gate</span><span class="stage-latency">--</span></li>
+                        <li class="stage" data-stage="policy"><span class="stage-dot" aria-hidden="true"></span><span class="stage-name">Policy</span><span class="stage-latency">--</span></li>
+                        <li class="stage" data-stage="llm"><span class="stage-dot" aria-hidden="true"></span><span class="stage-name">LLM</span><span class="stage-latency">--</span></li>
+                        <li class="stage" data-stage="tts"><span class="stage-dot" aria-hidden="true"></span><span class="stage-name">Text to speech</span><span class="stage-latency">--</span></li>
+                    </ol>
 
-                <!-- Escalation Alert -->
-                <div class="escalation-alert" id="escalationAlert" hidden>
-                    <div class="alert-icon">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path
-                                d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-                            <line x1="12" y1="9" x2="12" y2="13" />
-                            <line x1="12" y1="17" x2="12.01" y2="17" />
-                        </svg>
-                    </div>
-                    <div class="alert-content">
-                        <h4>Medical Emergency Detected</h4>
-                        <p id="escalationReason"></p>
-                        <div class="emergency-info">
-                            <strong>Call Emergency: 108</strong>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Conversation Section -->
-                <div class="conversation-section" id="conversationSection">
-                    <h3>Conversation</h3>
-                    <div class="conversation-container" id="conversationContainer">
-                        <div class="empty-state">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                            </svg>
-                            <p>Start a conversation by recording or uploading audio</p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Audio Player -->
-                <div class="audio-player-section" id="audioPlayerSection" hidden>
-                    <h3>AI Response</h3>
-                    <audio id="responseAudio" controls></audio>
-                </div>
-
-                <!-- Signal Details -->
-                <div class="signals-section" id="signalsSection" hidden>
-                    <h3>Detected Signals</h3>
-                    <div class="signals-grid">
-                        <div class="signal-card">
-                            <span class="signal-label">Intent</span>
-                            <span class="signal-value" id="signalIntent">--</span>
-                        </div>
-                        <div class="signal-card">
-                            <span class="signal-label">Urgency</span>
-                            <span class="signal-value" id="signalUrgency">--</span>
-                        </div>
-                        <div class="signal-card">
-                            <span class="signal-label">Tone</span>
-                            <span class="signal-value" id="signalTone">--</span>
-                        </div>
-                        <div class="signal-card">
-                            <span class="signal-label">Language</span>
-                            <span class="signal-value" id="signalLanguage">--</span>
-                        </div>
-                    </div>
+                    <dl class="signals-grid" id="signalsSection" hidden>
+                        <div class="signal-card"><dt>Intent</dt><dd class="signal-value" id="signalIntent">--</dd></div>
+                        <div class="signal-card"><dt>Urgency</dt><dd class="signal-value" id="signalUrgency">--</dd></div>
+                        <div class="signal-card"><dt>Tone</dt><dd class="signal-value" id="signalTone">--</dd></div>
+                        <div class="signal-card"><dt>Language</dt><dd class="signal-value" id="signalLanguage">--</dd></div>
+                    </dl>
+                    <div class="context-badges" id="contextIndicators" hidden></div>
                 </div>
             </div>
+        </section>
 
-            <!-- AI Call Interface -->
-            <div id="aicall-tab" class="tab-content">
-                <div class="call-interface">
-                    <div class="call-status">
-                        <div class="call-avatar">
-                            <svg viewBox="0 0 24 24" class="avatar-icon">
-                                <path
-                                    d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z" />
-                            </svg>
-                            <div class="speaking-ring"></div>
-                        </div>
-                        <h2 id="callStatusText">Ready to Call</h2>
-                        <p id="callLatencyText" class="latency-text">latency: --ms</p>
+        <!-- ============================ LIVE CALL ============================ -->
+        <section id="panel-call" class="tab-panel" role="tabpanel" aria-labelledby="tab-call" hidden>
+            <div class="card call-card">
+                <div class="call-status">
+                    <div class="call-avatar" data-state="idle" aria-hidden="true">
+                        <span class="speaking-ring"></span>
+                        <svg viewBox="0 0 24 24" class="avatar-icon"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/></svg>
                     </div>
+                    <h2 id="callStatusText" class="call-status-text" data-tone="neutral" aria-live="polite">Ready to call</h2>
+                    <p id="callHint" class="call-hint">Talk naturally. The assistant replies when you pause.</p>
+                    <p id="callLatencyText" class="latency-text">Latency: -- ms</p>
+                </div>
 
-                    <div class="visualizer-container">
-                        <canvas id="audioVisualizer" width="600" height="100"></canvas>
+                <div class="visualizer">
+                    <canvas id="audioVisualizer" aria-label="Microphone level" role="img"></canvas>
+                </div>
+
+                <div class="call-controls">
+                    <div class="field call-language">
+                        <label for="callLanguageSelect">Call language</label>
+                        <select id="callLanguageSelect" class="select">
+                            <option value="en">English</option>
+                            <option value="hi">Hindi · हिन्दी</option>
+                            <option value="te">Telugu · తెలుగు</option>
+                            <option value="kn">Kannada · ಕನ್ನಡ</option>
+                            <option value="ta">Tamil · தமிழ்</option>
+                        </select>
                     </div>
-
-                    <div class="call-controls">
-                        <div class="language-selector-call">
-                            <select id="callLanguageSelect" aria-label="Call language">
-                                <option value="en">English</option>
-                                <option value="hi">Hindi</option>
-                                <option value="te">Telugu</option>
-                                <option value="kn">Kannada</option>
-                                <option value="ta">Tamil</option>
-                            </select>
-                        </div>
-                        <button id="startCallBtn" class="call-btn start">
-                            <svg viewBox="0 0 24 24" fill="currentColor">
-                                <path
-                                    d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56a.977.977 0 0 0-1.01.24l-1.57 1.97c-2.83-1.43-5.15-3.75-6.57-6.59l1.97-1.57c.23-.23.32-.55.24-1.01a17.402 17.402 0 0 1-.56-3.53c.09-1.29-1.37-2.33-2.73-2.33H3.06c-1.33 0-2.45 1-2.45 2.34C.73 15.7 10.3 25.26 19.34 25.26c1.33 0 2.34-1.12 2.34-2.45v-3.19c0-1.36-1.04-2.82-2.34-2.74z" />
-                            </svg>
-                            Start Call
+                    <div class="call-buttons">
+                        <button type="button" id="startCallBtn" class="btn btn-success btn-lg" disabled>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                            Start call
                         </button>
-                        <button id="endCallBtn" class="call-btn end" disabled>
-                            <svg viewBox="0 0 24 24" fill="currentColor">
-                                <path
-                                    d="M12 9c-1.6 0-3.15.25-4.6.72v3.1c0 .39-.23.74-.56.9-.98.49-1.87 1.12-2.66 1.85-.18.18-.43.28-.7.28-.28 0-.53-.11-.7-.29L.29 13.08a.987.987 0 0 1 0-1.41C2.93 8.35 7.22 6 12 6c4.78 0 9.07 2.35 11.71 5.67.39.39.39 1.02 0 1.41l-2.49 2.49c-.18.18-.43.29-.7.29-.27 0-.52-.11-.7-.28a11.27 11.27 0 0 0-2.66-1.85.996.996 0 0 1-.56-.9v-3.1C15.15 9.25 13.6 9 12 9z" />
-                            </svg>
-                            End Call
+                        <button type="button" id="endCallBtn" class="btn btn-danger btn-lg" disabled>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.42 19.42 0 0 1-3.33-2.67m-2.67-3.34a19.79 19.79 0 0 1-3.07-8.63A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91M23 1 1 23"/></svg>
+                            End call
                         </button>
                     </div>
                 </div>
             </div>
-        </main>
+        </section>
 
-        <!-- Footer -->
-        <footer class="footer">
-            <p>Apollo Hospital Voice AI Assistant - Hackathon Demo</p>
-            <p class="footer-sub">Supports: Kannada, Tamil, Telugu, Hindi | Target: &lt;500ms latency, &lt;Rs.2/min</p>
-        </footer>
-    </div>
+        <p class="disclaimer">
+            General information only, not medical advice. In an emergency call <strong>108</strong>.
+        </p>
+    </main>
 
-    <script src="/static/app.js"></script>
+    <footer class="app-footer">
+        <p>Apollo Voice AI · Hackathon demo · Kannada, Tamil, Telugu, Hindi, English</p>
+    </footer>
+
+    <div class="toast-region" id="toastRegion"></div>
+    <script src="/static/app.js" defer></script>
 </body>
 
 </html>
