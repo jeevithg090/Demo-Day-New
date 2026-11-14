@@ -3,7 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Admin panel for configuring the hospital voice assistant: settings, doctors, departments and FAQs.">
+    <meta name="robots" content="noindex">
+    <meta name="theme-color" content="#1a56db">
     <title>Apollo Hospital - Admin Panel</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Ccircle cx='20' cy='20' r='18' fill='%231a56db'/%3E%3Cpath d='M20 8v24M12 20h16' stroke='%23fff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
     <link rel="stylesheet" href="/static/admin.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
@@ -13,7 +17,7 @@
         <aside class="sidebar">
             <div class="sidebar-header">
                 <div class="logo">
-                    <svg viewBox="0 0 40 40" class="logo-icon">
+                    <svg viewBox="0 0 40 40" class="logo-icon" aria-hidden="true">
                         <circle cx="20" cy="20" r="18" fill="#1a56db" stroke="#fff" stroke-width="2"/>
                         <path d="M20 8 L20 32 M12 20 L28 20" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
                     </svg>
@@ -25,28 +29,28 @@
             </div>
             
             <nav class="sidebar-nav">
-                <a href="#settings" class="nav-item active" data-tab="settings">
+                <a href="#settings" class="nav-item active" data-tab="settings" aria-label="Settings">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="12" cy="12" r="3"/>
                         <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
                     </svg>
                     <span>Settings</span>
                 </a>
-                <a href="#doctors" class="nav-item" data-tab="doctors">
+                <a href="#doctors" class="nav-item" data-tab="doctors" aria-label="Doctors">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
                         <circle cx="12" cy="7" r="4"/>
                     </svg>
                     <span>Doctors</span>
                 </a>
-                <a href="#departments" class="nav-item" data-tab="departments">
+                <a href="#departments" class="nav-item" data-tab="departments" aria-label="Departments">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
                         <polyline points="9 22 9 12 15 12 15 22"/>
                     </svg>
                     <span>Departments</span>
                 </a>
-                <a href="#faqs" class="nav-item" data-tab="faqs">
+                <a href="#faqs" class="nav-item" data-tab="faqs" aria-label="FAQs">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="12" cy="12" r="10"/>
                         <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
@@ -54,7 +58,7 @@
                     </svg>
                     <span>FAQs</span>
                 </a>
-                <a href="#escalation" class="nav-item" data-tab="escalation">
+                <a href="#escalation" class="nav-item" data-tab="escalation" aria-label="Escalation Rules">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
                         <line x1="12" y1="9" x2="12" y2="13"/>
@@ -445,7 +449,7 @@
     </div>
     
     <!-- Toast Notification -->
-    <div class="toast" id="toast"></div>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
     
     <script src="/static/admin.js"></script>
 </body>
