@@ -28,15 +28,18 @@ from fastapi import (
     Form,
     Header,
     HTTPException,
+    Request,
     UploadFile,
     WebSocket,
     WebSocketDisconnect,
 )
 from fastapi.concurrency import run_in_threadpool
+from fastapi.exception_handlers import http_exception_handler
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from voice_ai import speech
 from voice_ai.conversation import ConversationManager
@@ -207,6 +210,16 @@ if settings.cors_origins:
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
+@app.exception_handler(StarletteHTTPException)
+async def not_found_page(request: Request, exc: StarletteHTTPException):
+    """Serve a friendly HTML 404 to browsers; API clients keep the JSON error."""
+    wants_html = "text/html" in request.headers.get("accept", "")
+    is_api = request.url.path.startswith(("/api/", "/static/", "/ws/"))
+    if exc.status_code == 404 and wants_html and not is_api:
+        return FileResponse(STATIC_DIR / "404.html", status_code=404)
+    return await http_exception_handler(request, exc)
+
+
 # ============================================================================
 # AUTH
 # ============================================================================
@@ -263,6 +276,8 @@ async def health_check(svc: AppServices = Depends(get_services)):
         "redis_connected": svc.redis.is_connected,
         "rag_ready": svc.rag.is_ready,
         "admin_auth_enabled": bool(svc.settings.admin_token),
+        "speech_enabled": svc.settings.load_models,
+        "max_upload_mb": svc.settings.max_upload_mb,
         "supported_languages": SUPPORTED_LANGUAGES,
     }
 

@@ -164,3 +164,23 @@ def test_client_supplied_id_is_ignored_on_create(client, redis_store):
     )
     assert response.json()["id"] != "faq001"
     assert len(client.get("/api/admin/faqs").json()["faqs"]) == 2
+
+
+def test_unknown_page_serves_html_404(client):
+    response = client.get("/does-not-exist", headers={"accept": "text/html"})
+    assert response.status_code == 404
+    assert "text/html" in response.headers["content-type"]
+    assert "Page not found" in response.text
+
+
+def test_unknown_api_path_keeps_json_404(client):
+    response = client.get("/api/nope", headers={"accept": "text/html"})
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Not Found"}
+    assert client.get("/does-not-exist").json() == {"detail": "Not Found"}
+
+
+def test_health_exposes_ui_hints(client):
+    data = client.get("/health").json()
+    assert data["max_upload_mb"] == 10
+    assert data["speech_enabled"] is False
