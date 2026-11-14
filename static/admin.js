@@ -1,592 +1,33 @@
 /**
- * Apollo Hospital Admin Panel JavaScript
- * Handles all CRUD operations for settings, doctors, departments, and FAQs
+ * Apollo Voice AI admin panel: settings, doctors, departments, FAQs and
+ * escalation keywords. Reads are public; writes send the admin bearer token
+ * when the server requires one (ADMIN_TOKEN).
  */
-
-// ============================================================================
-// STATE
-// ============================================================================
 
 const state = {
     config: {},
     doctors: [],
     departments: [],
-    faqs: []
+    faqs: [],
+    redisConnected: true,
+    authEnabled: false,
 };
 
-// ============================================================================
-// INITIALIZATION
-// ============================================================================
+const ADMIN_TOKEN_KEY = 'apollo_admin_token';
+const TABS = ['settings', 'doctors', 'departments', 'faqs', 'escalation'];
+const $ = (id) => document.getElementById(id);
+const toast = (message, type = 'success') => window.ui.toast(message, type);
 
-document.addEventListener('DOMContentLoaded', () => {
-    initTabs();
-    loadAllData();
-    setupFormHandlers();
-});
-
-function initTabs() {
-    const navItems = document.querySelectorAll('.nav-item');
-    
-    navItems.forEach(item => {
-        item.addEventListener('click', (e) => {
-            e.preventDefault();
-            const tabId = item.dataset.tab;
-            
-            // Update nav
-            navItems.forEach(n => n.classList.remove('active'));
-            item.classList.add('active');
-            
-            // Update content
-            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-            document.getElementById(tabId).classList.add('active');
-        });
-    });
-}
-
-async function loadAllData() {
-    await Promise.all([
-        loadSettings(),
-        loadDoctors(),
-        loadDepartments(),
-        loadFaqs()
-    ]);
-}
-
-function setupFormHandlers() {
-    // Settings form
-    document.getElementById('settingsForm').addEventListener('submit', saveSettings);
-    
-    // Escalation form
-    document.getElementById('escalationForm').addEventListener('submit', saveEscalation);
-    
-    // Doctor form
-    document.getElementById('doctorForm').addEventListener('submit', saveDoctor);
-    
-    // Department form
-    document.getElementById('departmentForm').addEventListener('submit', saveDepartment);
-    
-    // FAQ form
-    document.getElementById('faqForm').addEventListener('submit', saveFaq);
-}
-
-// ============================================================================
-// SETTINGS
-// ============================================================================
-
-async function loadSettings() {
-    try {
-        const response = await adminFetch('/api/admin/config');
-        if (response.ok) {
-            state.config = await response.json();
-            populateSettingsForm(state.config);
-        }
-    } catch (error) {
-        console.error('Error loading settings:', error);
-        showToast('Failed to load settings', 'error');
-    }
-}
-
-function populateSettingsForm(config) {
-    // Text fields
-    document.getElementById('hospitalName').value = config.hospital_name || 'Apollo Hospital';
-    document.getElementById('city').value = config.city || 'Bengaluru';
-    document.getElementById('emergencyNumber').value = config.emergency_number || '108';
-    document.getElementById('helpline').value = config.helpline || '1860-500-1066';
-    document.getElementById('maxWords').value = config.max_words || 50;
-    document.getElementById('sessionTimeout').value = config.session_timeout_minutes || 30;
-    document.getElementById('disclaimerText').value = config.disclaimer_text || '';
-    
-    // Selects
-    document.getElementById('tone').value = config.tone || 'formal';
-    document.getElementById('primaryLanguage').value = config.primary_language || 'en';
-    
-    // Checkboxes
-    document.getElementById('disclaimerRequired').checked = config.disclaimer_required !== false;
-    document.getElementById('alwaysRecommendDoctor').checked = config.always_recommend_doctor !== false;
-    document.getElementById('ttsEnabled').checked = config.tts_enabled !== false;
-    
-    // Escalation keywords
-    const keywords = config.escalation_keywords || [];
-    document.getElementById('escalationKeywords').value = keywords.join('\n');
-}
-
-async function saveSettings(e) {
-    e.preventDefault();
-    
-    const formData = new FormData(e.target);
-    const config = {
-        hospital_name: formData.get('hospital_name'),
-        city: formData.get('city'),
-        emergency_number: formData.get('emergency_number'),
-        helpline: formData.get('helpline'),
-        tone: formData.get('tone'),
-        max_words: parseInt(formData.get('max_words')),
-        primary_language: formData.get('primary_language'),
-        session_timeout_minutes: parseInt(formData.get('session_timeout_minutes')),
-        disclaimer_required: formData.get('disclaimer_required') === 'on',
-        always_recommend_doctor: formData.get('always_recommend_doctor') === 'on',
-        tts_enabled: formData.get('tts_enabled') === 'on',
-        disclaimer_text: formData.get('disclaimer_text'),
-        supported_languages: ['kn', 'ta', 'te', 'hi', 'en']
-    };
-    
-    try {
-        const response = await adminFetch('/api/admin/config', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(config)
-        });
-        
-        if (response.ok) {
-            showToast('Settings saved successfully');
-            state.config = config;
-        } else {
-            throw new Error('Failed to save');
-        }
-    } catch (error) {
-        console.error('Error saving settings:', error);
-        showToast('Failed to save settings', 'error');
-    }
-}
-
-async function saveEscalation(e) {
-    e.preventDefault();
-    
-    const keywordsText = document.getElementById('escalationKeywords').value;
-    const keywords = keywordsText.split('\n').map(k => k.trim()).filter(k => k);
-    
-    try {
-        const response = await adminFetch('/api/admin/config', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                ...state.config,
-                escalation_keywords: keywords
-            })
-        });
-        
-        if (response.ok) {
-            showToast('Escalation rules saved successfully');
-            state.config.escalation_keywords = keywords;
-        } else {
-            throw new Error('Failed to save');
-        }
-    } catch (error) {
-        console.error('Error saving escalation rules:', error);
-        showToast('Failed to save escalation rules', 'error');
-    }
-}
-
-// ============================================================================
-// DOCTORS
-// ============================================================================
-
-async function loadDoctors() {
-    try {
-        const response = await adminFetch('/api/admin/doctors');
-        if (response.ok) {
-            state.doctors = (await response.json()).doctors || [];
-            renderDoctorsTable();
-        }
-    } catch (error) {
-        console.error('Error loading doctors:', error);
-    }
-}
-
-function renderDoctorsTable() {
-    const tbody = document.querySelector('#doctorsTable tbody');
-    const emptyState = document.getElementById('doctorsEmpty');
-    
-    if (state.doctors.length === 0) {
-        tbody.innerHTML = '';
-        emptyState.style.display = 'block';
-        return;
-    }
-    
-    emptyState.style.display = 'none';
-    tbody.innerHTML = state.doctors.map(doc => `
-        <tr>
-            <td>${escapeHtml(doc.name)}${doc.name_kn ? ` <span class="lang-badge">${escapeHtml(doc.name_kn)}</span>` : ''}</td>
-            <td>${escapeHtml(doc.specialization || '-')}</td>
-            <td>${escapeHtml(doc.department || '-')}</td>
-            <td>${escapeHtml(Array.isArray(doc.available_days) ? doc.available_days.join(', ') : doc.available_days || '-')}</td>
-            <td>${escapeHtml(doc.timings || '-')}</td>
-            <td class="actions">
-                <button class="btn-icon" onclick="editDoctor('${escapeHtml(doc.id)}')" title="Edit" aria-label="Edit">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                    </svg>
-                </button>
-                <button class="btn-icon btn-danger" onclick="deleteDoctor('${escapeHtml(doc.id)}')" title="Delete" aria-label="Delete">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="3 6 5 6 21 6"/>
-                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                    </svg>
-                </button>
-            </td>
-        </tr>
-    `).join('');
-}
-
-function showDoctorModal(doctor = null) {
-    const modal = document.getElementById('doctorModal');
-    const form = document.getElementById('doctorForm');
-    const title = document.getElementById('doctorModalTitle');
-    
-    form.reset();
-    
-    if (doctor) {
-        title.textContent = 'Edit Doctor';
-        document.getElementById('doctorId').value = doctor.id;
-        document.getElementById('doctorName').value = doctor.name || '';
-        document.getElementById('doctorNameKn').value = doctor.name_kn || '';
-        document.getElementById('doctorSpec').value = doctor.specialization || '';
-        document.getElementById('doctorDept').value = doctor.department || '';
-        document.getElementById('doctorTimings').value = doctor.timings || '';
-        
-        // Set available days checkboxes
-        const days = Array.isArray(doctor.available_days) ? doctor.available_days : [];
-        document.querySelectorAll('input[name="available_days"]').forEach(cb => {
-            cb.checked = days.includes(cb.value);
-        });
-    } else {
-        title.textContent = 'Add Doctor';
-        document.getElementById('doctorId').value = '';
-    }
-    
-    modal.classList.add('active');
-}
-
-function editDoctor(id) {
-    const doctor = state.doctors.find(d => d.id === id);
-    if (doctor) {
-        showDoctorModal(doctor);
-    }
-}
-
-async function saveDoctor(e) {
-    e.preventDefault();
-    
-    const formData = new FormData(e.target);
-    const availableDays = [];
-    document.querySelectorAll('input[name="available_days"]:checked').forEach(cb => {
-        availableDays.push(cb.value);
-    });
-    
-    const doctor = {
-        name: formData.get('name'),
-        name_kn: formData.get('name_kn'),
-        specialization: formData.get('specialization'),
-        department: formData.get('department'),
-        timings: formData.get('timings'),
-        available_days: availableDays
-    };
-    
-    const id = formData.get('id');
-    
-    try {
-        let response;
-        if (id) {
-            response = await adminFetch(`/api/admin/doctors/${id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(doctor)
-            });
-        } else {
-            response = await adminFetch('/api/admin/doctors', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(doctor)
-            });
-        }
-        
-        if (response.ok) {
-            showToast(id ? 'Doctor updated' : 'Doctor added');
-            closeModal('doctorModal');
-            await loadDoctors();
-        } else {
-            throw new Error('Failed to save');
-        }
-    } catch (error) {
-        console.error('Error saving doctor:', error);
-        showToast('Failed to save doctor', 'error');
-    }
-}
-
-async function deleteDoctor(id) {
-    if (!confirm('Are you sure you want to delete this doctor?')) return;
-    
-    try {
-        const response = await adminFetch(`/api/admin/doctors/${id}`, {
-            method: 'DELETE'
-        });
-        
-        if (response.ok) {
-            showToast('Doctor deleted');
-            await loadDoctors();
-        } else {
-            throw new Error('Failed to delete');
-        }
-    } catch (error) {
-        console.error('Error deleting doctor:', error);
-        showToast('Failed to delete doctor', 'error');
-    }
-}
-
-// ============================================================================
-// DEPARTMENTS
-// ============================================================================
-
-async function loadDepartments() {
-    try {
-        const response = await adminFetch('/api/admin/departments');
-        if (response.ok) {
-            state.departments = (await response.json()).departments || [];
-            renderDepartmentsTable();
-        }
-    } catch (error) {
-        console.error('Error loading departments:', error);
-    }
-}
-
-function renderDepartmentsTable() {
-    const tbody = document.querySelector('#departmentsTable tbody');
-    const emptyState = document.getElementById('departmentsEmpty');
-    
-    if (state.departments.length === 0) {
-        tbody.innerHTML = '';
-        emptyState.style.display = 'block';
-        return;
-    }
-    
-    emptyState.style.display = 'none';
-    tbody.innerHTML = state.departments.map(dept => `
-        <tr>
-            <td>${escapeHtml(dept.name)}</td>
-            <td>${escapeHtml(dept.floor || '-')}</td>
-            <td>${escapeHtml(dept.timings || '-')}</td>
-            <td>${escapeHtml(dept.contact || '-')}</td>
-            <td class="actions">
-                <button class="btn-icon btn-danger" onclick="deleteDepartment('${escapeHtml(dept.id)}')" title="Delete" aria-label="Delete">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="3 6 5 6 21 6"/>
-                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                    </svg>
-                </button>
-            </td>
-        </tr>
-    `).join('');
-}
-
-function showDepartmentModal() {
-    const modal = document.getElementById('departmentModal');
-    const form = document.getElementById('departmentForm');
-    
-    form.reset();
-    document.getElementById('departmentId').value = '';
-    modal.classList.add('active');
-}
-
-async function saveDepartment(e) {
-    e.preventDefault();
-    
-    const formData = new FormData(e.target);
-    const department = {
-        name: formData.get('name'),
-        floor: formData.get('floor'),
-        timings: formData.get('timings'),
-        contact: formData.get('contact')
-    };
-    
-    try {
-        const response = await adminFetch('/api/admin/departments', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(department)
-        });
-        
-        if (response.ok) {
-            showToast('Department added');
-            closeModal('departmentModal');
-            await loadDepartments();
-        } else {
-            throw new Error('Failed to save');
-        }
-    } catch (error) {
-        console.error('Error saving department:', error);
-        showToast('Failed to save department', 'error');
-    }
-}
-
-async function deleteDepartment(id) {
-    if (!confirm('Are you sure you want to delete this department?')) return;
-    
-    try {
-        const response = await adminFetch(`/api/admin/departments/${id}`, {
-            method: 'DELETE'
-        });
-        
-        if (response.ok) {
-            showToast('Department deleted');
-            await loadDepartments();
-        } else {
-            throw new Error('Failed to delete');
-        }
-    } catch (error) {
-        console.error('Error deleting department:', error);
-        showToast('Failed to delete department', 'error');
-    }
-}
-
-// ============================================================================
-// FAQS
-// ============================================================================
-
-async function loadFaqs() {
-    try {
-        const response = await adminFetch('/api/admin/faqs');
-        if (response.ok) {
-            state.faqs = (await response.json()).faqs || [];
-            renderFaqsTable();
-        }
-    } catch (error) {
-        console.error('Error loading FAQs:', error);
-    }
-}
-
-function renderFaqsTable() {
-    const tbody = document.querySelector('#faqsTable tbody');
-    const emptyState = document.getElementById('faqsEmpty');
-    
-    if (state.faqs.length === 0) {
-        tbody.innerHTML = '';
-        emptyState.style.display = 'block';
-        return;
-    }
-    
-    emptyState.style.display = 'none';
-    tbody.innerHTML = state.faqs.map(faq => `
-        <tr>
-            <td>${escapeHtml(truncate(faq.question, 50))}</td>
-            <td>${escapeHtml(truncate(faq.answer, 80))}</td>
-            <td><span class="category-badge">${escapeHtml(faq.category || 'general')}</span></td>
-            <td class="actions">
-                <button class="btn-icon" onclick="editFaq('${escapeHtml(faq.id)}')" title="Edit" aria-label="Edit">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                    </svg>
-                </button>
-                <button class="btn-icon btn-danger" onclick="deleteFaq('${escapeHtml(faq.id)}')" title="Delete" aria-label="Delete">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="3 6 5 6 21 6"/>
-                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                    </svg>
-                </button>
-            </td>
-        </tr>
-    `).join('');
-}
-
-function showFaqModal(faq = null) {
-    const modal = document.getElementById('faqModal');
-    const form = document.getElementById('faqForm');
-    const title = document.getElementById('faqModalTitle');
-    
-    form.reset();
-    
-    if (faq) {
-        title.textContent = 'Edit FAQ';
-        document.getElementById('faqId').value = faq.id;
-        document.getElementById('faqQuestion').value = faq.question || '';
-        document.getElementById('faqQuestionKn').value = faq.question_kn || '';
-        document.getElementById('faqAnswer').value = faq.answer || '';
-        document.getElementById('faqAnswerKn').value = faq.answer_kn || '';
-        document.getElementById('faqCategory').value = faq.category || 'general';
-    } else {
-        title.textContent = 'Add FAQ';
-        document.getElementById('faqId').value = '';
-    }
-    
-    modal.classList.add('active');
-}
-
-function editFaq(id) {
-    const faq = state.faqs.find(f => f.id === id);
-    if (faq) {
-        showFaqModal(faq);
-    }
-}
-
-async function saveFaq(e) {
-    e.preventDefault();
-    
-    const formData = new FormData(e.target);
-    const faq = {
-        question: formData.get('question'),
-        question_kn: formData.get('question_kn'),
-        answer: formData.get('answer'),
-        answer_kn: formData.get('answer_kn'),
-        category: formData.get('category')
-    };
-    
-    const id = formData.get('id');
-    
-    try {
-        let response;
-        if (id) {
-            response = await adminFetch(`/api/admin/faqs/${id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(faq)
-            });
-        } else {
-            response = await adminFetch('/api/admin/faqs', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(faq)
-            });
-        }
-        
-        if (response.ok) {
-            showToast(id ? 'FAQ updated' : 'FAQ added');
-            closeModal('faqModal');
-            await loadFaqs();
-        } else {
-            throw new Error('Failed to save');
-        }
-    } catch (error) {
-        console.error('Error saving FAQ:', error);
-        showToast('Failed to save FAQ', 'error');
-    }
-}
-
-async function deleteFaq(id) {
-    if (!confirm('Are you sure you want to delete this FAQ?')) return;
-    
-    try {
-        const response = await adminFetch(`/api/admin/faqs/${id}`, {
-            method: 'DELETE'
-        });
-        
-        if (response.ok) {
-            showToast('FAQ deleted');
-            await loadFaqs();
-        } else {
-            throw new Error('Failed to delete');
-        }
-    } catch (error) {
-        console.error('Error deleting FAQ:', error);
-        showToast('Failed to delete FAQ', 'error');
-    }
-}
+const ICONS = {
+    edit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>',
+    trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>',
+    error: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>',
+    empty: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>',
+};
 
 // ============================================================================
 // UTILITIES
 // ============================================================================
-
-const ADMIN_TOKEN_KEY = 'apollo_admin_token';
 
 /** Escape a value for safe interpolation into HTML. */
 function escapeHtml(value) {
@@ -613,61 +54,720 @@ function setAdminToken(token) {
     } catch {
         /* storage unavailable: token lives only for this request */
     }
+    updateTokenButton();
+}
+
+function updateTokenButton() {
+    const btn = $('tokenButton');
+    btn.hidden = !state.authEnabled;
+    $('tokenButtonText').textContent = getAdminToken() ? 'Forget admin token' : 'Enter admin token';
+}
+
+async function errorMessage(response, fallback) {
+    if (response.status === 401) return 'The admin token was missing or not accepted, so nothing was saved.';
+    try {
+        const data = await response.json();
+        if (typeof data.detail === 'string') return data.detail === 'Redis not connected' ? 'Redis is not connected, so changes cannot be saved.' : data.detail;
+        if (Array.isArray(data.detail) && data.detail[0]) {
+            const d = data.detail[0];
+            const field = Array.isArray(d.loc) ? d.loc[d.loc.length - 1] : 'value';
+            return `${String(field).replace(/_/g, ' ')}: ${d.msg}`;
+        }
+    } catch {
+        /* not JSON */
+    }
+    return fallback;
 }
 
 /**
- * fetch() wrapper for the admin API. Sends the admin bearer token (if the
- * server requires one) and asks for it once when the server answers 401.
+ * fetch() wrapper for the admin API. Sends the bearer token (if any) and,
+ * when the server answers 401, asks for the token once and retries.
  */
 async function adminFetch(url, options = {}, retried = false) {
     const headers = { ...(options.headers || {}) };
     const token = getAdminToken();
-    if (token) headers['Authorization'] = `Bearer ${token}`;
+    if (token) headers.Authorization = `Bearer ${token}`;
 
     const response = await fetch(url, { ...options, headers });
-    if (response.status === 401 && !retried) {
-        const entered = window.prompt('Enter the admin token (ADMIN_TOKEN) to make changes:');
-        if (entered) {
-            setAdminToken(entered.trim());
-            return adminFetch(url, options, true);
-        }
-    } else if (response.status === 401) {
+    if (response.status === 401) {
         setAdminToken('');
+        if (!retried) {
+            const entered = await requestToken(Boolean(token));
+            if (entered) {
+                setAdminToken(entered);
+                return adminFetch(url, options, true);
+            }
+        }
     }
     return response;
 }
 
-function closeModal(modalId) {
-    document.getElementById(modalId).classList.remove('active');
+function jsonRequest(method, body) {
+    return { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) };
 }
 
-function showToast(message, type = 'success') {
-    const toast = document.getElementById('toast');
-    toast.textContent = message;
-    toast.className = `toast ${type} show`;
-    
-    setTimeout(() => {
-        toast.classList.remove('show');
-    }, 3000);
+function setBusy(button, busy, busyLabel = 'Saving…') {
+    if (!button) return;
+    if (busy) {
+        button.dataset.label = button.innerHTML;
+        button.classList.add('is-busy');
+        button.textContent = busyLabel;
+        button.disabled = true;
+    } else {
+        button.classList.remove('is-busy');
+        if (button.dataset.label) button.innerHTML = button.dataset.label;
+        button.disabled = false;
+    }
 }
 
-function truncate(str, len) {
-    if (!str) return '-';
-    return str.length > len ? str.substring(0, len) + '...' : str;
+// ============================================================================
+// DIALOGS
+// ============================================================================
+
+function openDialog(id) {
+    const dialog = $(id);
+    clearErrors(dialog.querySelector('form'));
+    dialog.showModal();
+    const first = dialog.querySelector('input:not([type=hidden]), textarea, select');
+    if (first) first.focus();
 }
 
-// Close modal when clicking outside
-document.querySelectorAll('.modal').forEach(modal => {
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            modal.classList.remove('active');
+function closeDialog(id) {
+    $(id).close();
+}
+
+function setupDialogs() {
+    document.querySelectorAll('dialog').forEach((dialog) => {
+        dialog.querySelectorAll('[data-close]').forEach((btn) => btn.addEventListener('click', () => dialog.close('cancel')));
+        // Click on the backdrop closes the dialog.
+        dialog.addEventListener('click', (e) => {
+            if (e.target === dialog) dialog.close('cancel');
+        });
+    });
+}
+
+function requestToken(wasRejected) {
+    const dialog = $('tokenModal');
+    const form = $('tokenForm');
+    const input = $('tokenInput');
+    form.reset();
+    clearErrors(form);
+    if (wasRejected) showFieldError(input, 'That token was not accepted. Check ADMIN_TOKEN on the server.');
+
+    return new Promise((resolve) => {
+        const onSubmit = (e) => {
+            e.preventDefault();
+            const value = input.value.trim();
+            if (!value) {
+                showFieldError(input, 'Enter the admin token.');
+                input.focus();
+                return;
+            }
+            cleanup();
+            dialog.close('ok');
+            resolve(value);
+        };
+        const onClose = () => {
+            cleanup();
+            resolve(null);
+        };
+        const cleanup = () => {
+            form.removeEventListener('submit', onSubmit);
+            dialog.removeEventListener('close', onClose);
+        };
+        form.addEventListener('submit', onSubmit);
+        dialog.addEventListener('close', onClose);
+        dialog.showModal();
+        input.focus();
+    });
+}
+
+function confirmDialog(title, text, confirmLabel = 'Delete') {
+    const dialog = $('confirmModal');
+    $('confirmTitle').textContent = title;
+    $('confirmText').textContent = text;
+    dialog.querySelector('button[value="confirm"]').textContent = confirmLabel;
+    dialog.returnValue = '';
+    return new Promise((resolve) => {
+        dialog.addEventListener('close', () => resolve(dialog.returnValue === 'confirm'), { once: true });
+        dialog.showModal();
+    });
+}
+
+// ============================================================================
+// VALIDATION
+// ============================================================================
+
+function fieldLabel(input) {
+    const label = document.querySelector(`label[for="${input.id}"]`);
+    return label ? label.textContent.replace('*', '').trim() : 'This field';
+}
+
+function showFieldError(input, message) {
+    input.setAttribute('aria-invalid', 'true');
+    const id = `${input.id}-error`;
+    let node = document.getElementById(id);
+    if (!node) {
+        node = document.createElement('span');
+        node.id = id;
+        node.className = 'field-error';
+        input.insertAdjacentElement('afterend', node);
+        const described = (input.getAttribute('aria-describedby') || '').split(' ').filter(Boolean);
+        input.setAttribute('aria-describedby', [id, ...described].join(' '));
+    }
+    node.textContent = message;
+}
+
+function clearFieldError(input) {
+    input.removeAttribute('aria-invalid');
+    const node = document.getElementById(`${input.id}-error`);
+    if (node) {
+        node.remove();
+        const described = (input.getAttribute('aria-describedby') || '').split(' ').filter((x) => x && x !== node.id);
+        if (described.length) input.setAttribute('aria-describedby', described.join(' '));
+        else input.removeAttribute('aria-describedby');
+    }
+}
+
+function clearErrors(form) {
+    if (!form) return;
+    form.querySelectorAll('[aria-invalid="true"]').forEach(clearFieldError);
+}
+
+/** Validate a form; shows inline messages and focuses the first problem. */
+function validateForm(form) {
+    let firstInvalid = null;
+    form.querySelectorAll('input, textarea, select').forEach((input) => {
+        if (input.type === 'hidden' || input.type === 'checkbox') return;
+        clearFieldError(input);
+        const value = input.value.trim();
+        let message = '';
+        if (input.required && !value) {
+            message = `${fieldLabel(input)} is required.`;
+        } else if (input.type === 'number' && value) {
+            const n = Number(value);
+            const min = input.min !== '' ? Number(input.min) : -Infinity;
+            const max = input.max !== '' ? Number(input.max) : Infinity;
+            if (!Number.isInteger(n)) message = 'Enter a whole number.';
+            else if (n < min || n > max) message = `Enter a number between ${input.min} and ${input.max}.`;
+        }
+        if (message) {
+            showFieldError(input, message);
+            firstInvalid = firstInvalid || input;
         }
     });
-});
+    if (firstInvalid) firstInvalid.focus();
+    return !firstInvalid;
+}
 
-// Keyboard shortcuts
-document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-        document.querySelectorAll('.modal.active').forEach(m => m.classList.remove('active'));
+function setupLiveValidation() {
+    document.addEventListener('input', (e) => {
+        if (e.target.matches('[aria-invalid="true"]') && e.target.value.trim()) clearFieldError(e.target);
+    });
+}
+
+// ============================================================================
+// NAVIGATION (hash-based, so sections can be linked and survive reloads)
+// ============================================================================
+
+function showTab(tabId, focusHeading = false) {
+    if (!TABS.includes(tabId)) tabId = 'settings';
+    TABS.forEach((id) => {
+        $(`section-${id}`).hidden = id !== tabId;
+    });
+    document.querySelectorAll('.nav-item').forEach((item) => {
+        if (item.dataset.tab === tabId) item.setAttribute('aria-current', 'page');
+        else item.removeAttribute('aria-current');
+    });
+    const title = $(`section-${tabId}`).querySelector('h1');
+    document.title = `${title ? title.textContent : 'Admin'} · Apollo Voice AI admin`;
+    if (focusHeading) $('main').focus({ preventScroll: true });
+}
+
+function initTabs() {
+    window.addEventListener('hashchange', () => showTab(location.hash.slice(1), true));
+    showTab(location.hash.slice(1));
+}
+
+// ============================================================================
+// SERVER STATUS
+// ============================================================================
+
+async function loadHealth() {
+    try {
+        const data = await (await fetch('/health', { cache: 'no-store' })).json();
+        state.redisConnected = Boolean(data.redis_connected);
+        state.authEnabled = Boolean(data.admin_auth_enabled);
+    } catch {
+        state.redisConnected = true; // unknown: let the API report errors
     }
+    $('redisNotice').hidden = state.redisConnected;
+    document.querySelectorAll('[data-requires-write]').forEach((btn) => {
+        btn.disabled = !state.redisConnected;
+        if (!state.redisConnected) btn.title = 'Redis is not connected';
+    });
+    updateTokenButton();
+}
+
+// ============================================================================
+// TABLE STATES
+// ============================================================================
+
+function renderSkeleton(table, columns) {
+    const row = `<tr class="skeleton-row">${'<td><span class="skeleton"></span></td>'.repeat(columns)}</tr>`;
+    table.querySelector('tbody').innerHTML = row.repeat(3);
+}
+
+function renderTableState(stateEl, kind, { title, text, action, onAction } = {}) {
+    if (!kind) {
+        stateEl.replaceChildren();
+        return;
+    }
+    stateEl.innerHTML = `
+        <div class="state-block">
+            ${kind === 'error' ? ICONS.error : ICONS.empty}
+            <h3>${escapeHtml(title)}</h3>
+            <p>${escapeHtml(text)}</p>
+            ${action ? `<button type="button" class="btn btn-${kind === 'error' ? 'secondary' : 'primary'} btn-sm">${escapeHtml(action)}</button>` : ''}
+        </div>`;
+    const btn = stateEl.querySelector('button');
+    if (btn && onAction) {
+        btn.addEventListener('click', onAction);
+        if (kind === 'empty' && !state.redisConnected) btn.disabled = true;
+    }
+}
+
+function setCount(id, n) {
+    $(id).textContent = n ? String(n) : '';
+}
+
+/**
+ * Generic loader for a list endpoint: skeleton while loading, error with
+ * retry on failure, empty state with a call to action, else rows.
+ */
+async function loadCollection(view) {
+    const { key, url, table, stateEl, columns, countEl, render, emptyTitle, emptyText, emptyAction, onEmptyAction } = view;
+    $(table).hidden = false;
+    renderSkeleton($(table), columns);
+    renderTableState($(stateEl));
+    try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(String(response.status));
+        state[key] = (await response.json())[key] || [];
+    } catch {
+        $(table).querySelector('tbody').replaceChildren();
+        $(table).hidden = true;
+        renderTableState($(stateEl), 'error', {
+            title: `Couldn’t load ${key}`,
+            text: 'The server did not respond. Check that it is running, then try again.',
+            action: 'Try again',
+            onAction: () => loadCollection(view),
+        });
+        return;
+    }
+
+    setCount(countEl, state[key].length);
+    if (state[key].length === 0) {
+        $(table).hidden = true;
+        $(table).querySelector('tbody').replaceChildren();
+        renderTableState($(stateEl), 'empty', { title: emptyTitle, text: emptyText, action: emptyAction, onAction: onEmptyAction });
+        return;
+    }
+    $(table).hidden = false;
+    $(table).querySelector('tbody').innerHTML = state[key].map(render).join('');
+}
+
+function actionButtons(kind, item, label, { edit = true } = {}) {
+    const name = escapeHtml(label);
+    const id = escapeHtml(item.id);
+    return `
+        <td class="actions">
+            ${edit ? `<button type="button" class="btn-icon" data-action="edit-${kind}" data-id="${id}" aria-label="Edit ${name}" title="Edit">${ICONS.edit}</button>` : ''}
+            <button type="button" class="btn-icon btn-icon-danger" data-action="delete-${kind}" data-id="${id}" aria-label="Delete ${name}" title="Delete">${ICONS.trash}</button>
+        </td>`;
+}
+
+// ============================================================================
+// SETTINGS
+// ============================================================================
+
+async function loadSettings() {
+    try {
+        const response = await fetch('/api/admin/config');
+        if (!response.ok) throw new Error(String(response.status));
+        state.config = await response.json();
+        populateSettingsForm(state.config);
+    } catch {
+        toast('Couldn’t load settings. Showing defaults.', 'error');
+        populateSettingsForm({});
+    }
+}
+
+function populateSettingsForm(config) {
+    $('hospitalName').value = config.hospital_name || 'Apollo Hospital';
+    $('city').value = config.city || '';
+    $('emergencyNumber').value = config.emergency_number || '108';
+    $('helpline').value = config.helpline || '';
+    $('maxWords').value = config.max_words || 50;
+    $('sessionTimeout').value = config.session_timeout_minutes || 30;
+    $('disclaimerText').value = config.disclaimer_text || '';
+    $('tone').value = config.tone || 'formal';
+    $('primaryLanguage').value = config.primary_language || 'en';
+    $('disclaimerRequired').checked = config.disclaimer_required !== false;
+    $('alwaysRecommendDoctor').checked = config.always_recommend_doctor !== false;
+    $('ttsEnabled').checked = config.tts_enabled !== false;
+    $('escalationKeywords').value = (config.escalation_keywords || []).join('\n');
+    clearErrors($('settingsForm'));
+}
+
+async function saveConfig(config, button, successMessage) {
+    setBusy(button, true);
+    try {
+        const response = await adminFetch('/api/admin/config', jsonRequest('POST', config));
+        if (!response.ok) {
+            toast(await errorMessage(response, 'Couldn’t save. Please try again.'), 'error');
+            return false;
+        }
+        state.config = config;
+        toast(successMessage);
+        return true;
+    } catch {
+        toast('Couldn’t reach the server. Please try again.', 'error');
+        return false;
+    } finally {
+        setBusy(button, false);
+        if (!state.redisConnected) button.disabled = true;
+    }
+}
+
+async function saveSettings(e) {
+    e.preventDefault();
+    const form = e.target;
+    if (!validateForm(form)) return;
+    const data = new FormData(form);
+    const config = {
+        ...state.config,
+        hospital_name: data.get('hospital_name').trim(),
+        city: data.get('city').trim(),
+        emergency_number: data.get('emergency_number').trim(),
+        helpline: data.get('helpline').trim(),
+        tone: data.get('tone'),
+        max_words: parseInt(data.get('max_words'), 10),
+        primary_language: data.get('primary_language'),
+        session_timeout_minutes: parseInt(data.get('session_timeout_minutes'), 10),
+        disclaimer_required: data.get('disclaimer_required') === 'on',
+        always_recommend_doctor: data.get('always_recommend_doctor') === 'on',
+        tts_enabled: data.get('tts_enabled') === 'on',
+        disclaimer_text: data.get('disclaimer_text'),
+        supported_languages: state.config.supported_languages || ['kn', 'ta', 'te', 'hi', 'en'],
+    };
+    await saveConfig(config, e.submitter || form.querySelector('[type=submit]'), 'Settings saved');
+}
+
+async function saveEscalation(e) {
+    e.preventDefault();
+    const keywords = $('escalationKeywords')
+        .value.split('\n')
+        .map((k) => k.trim())
+        .filter(Boolean);
+    const unique = [...new Set(keywords)];
+    await saveConfig({ ...state.config, escalation_keywords: unique }, e.submitter || e.target.querySelector('[type=submit]'), `Saved ${unique.length} escalation keyword${unique.length === 1 ? '' : 's'}`);
+}
+
+// ============================================================================
+// DOCTORS
+// ============================================================================
+
+const doctorsView = {
+    key: 'doctors',
+    url: '/api/admin/doctors',
+    table: 'doctorsTable',
+    stateEl: 'doctorsState',
+    columns: 6,
+    countEl: 'doctorsCount',
+    emptyTitle: 'No doctors yet',
+    emptyText: 'Add the doctors patients ask about, with their department and hours.',
+    emptyAction: 'Add doctor',
+    onEmptyAction: () => showDoctorModal(),
+    render: (doc) => `
+        <tr>
+            <td class="cell-title"><span class="cell-primary">${escapeHtml(doc.name)}</span>${doc.name_kn ? `<span class="cell-sub" lang="kn">${escapeHtml(doc.name_kn)}</span>` : ''}</td>
+            <td data-label="Specialization">${escapeHtml(doc.specialization || '–')}</td>
+            <td data-label="Department">${escapeHtml(doc.department || '–')}</td>
+            <td data-label="Days">${escapeHtml(formatDays(doc.available_days))}</td>
+            <td data-label="Timings">${escapeHtml(doc.timings || '–')}</td>
+            ${actionButtons('doctor', doc, doc.name)}
+        </tr>`,
+};
+
+const DAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+function formatDays(days) {
+    if (!Array.isArray(days) || days.length === 0) return typeof days === 'string' && days ? days : '–';
+    if (days.length === 7) return 'Every day';
+    const sorted = [...days].sort((a, b) => DAY_ORDER.indexOf(a) - DAY_ORDER.indexOf(b));
+    return sorted.map((d) => d.slice(0, 3)).join(', ');
+}
+
+function showDoctorModal(doctor = null) {
+    const form = $('doctorForm');
+    form.reset();
+    $('doctorModalTitle').textContent = doctor ? 'Edit doctor' : 'Add doctor';
+    $('doctorId').value = doctor ? doctor.id : '';
+    $('departmentOptions').innerHTML = state.departments.map((d) => `<option value="${escapeHtml(d.name)}"></option>`).join('');
+    if (doctor) {
+        $('doctorName').value = doctor.name || '';
+        $('doctorNameKn').value = doctor.name_kn || '';
+        $('doctorSpec').value = doctor.specialization || '';
+        $('doctorDept').value = doctor.department || '';
+        $('doctorTimings').value = doctor.timings || '';
+        const days = Array.isArray(doctor.available_days) ? doctor.available_days : [];
+        form.querySelectorAll('input[name="available_days"]').forEach((cb) => (cb.checked = days.includes(cb.value)));
+    }
+    openDialog('doctorModal');
+}
+
+async function saveDoctor(e) {
+    e.preventDefault();
+    const form = e.target;
+    if (!validateForm(form)) return;
+    const data = new FormData(form);
+    const doctor = {
+        name: data.get('name').trim(),
+        name_kn: data.get('name_kn').trim(),
+        specialization: data.get('specialization').trim(),
+        department: data.get('department').trim(),
+        timings: data.get('timings').trim(),
+        available_days: data.getAll('available_days'),
+    };
+    const id = data.get('id');
+    await saveItem({
+        button: e.submitter,
+        url: id ? `/api/admin/doctors/${encodeURIComponent(id)}` : '/api/admin/doctors',
+        method: id ? 'PUT' : 'POST',
+        body: doctor,
+        dialog: 'doctorModal',
+        success: id ? `Updated ${doctor.name}` : `Added ${doctor.name}`,
+        reload: () => loadCollection(doctorsView),
+    });
+}
+
+// ============================================================================
+// DEPARTMENTS
+// ============================================================================
+
+const departmentsView = {
+    key: 'departments',
+    url: '/api/admin/departments',
+    table: 'departmentsTable',
+    stateEl: 'departmentsState',
+    columns: 5,
+    countEl: 'departmentsCount',
+    emptyTitle: 'No departments yet',
+    emptyText: 'Add departments so the assistant can tell patients where to go.',
+    emptyAction: 'Add department',
+    onEmptyAction: () => showDepartmentModal(),
+    render: (dept) => `
+        <tr>
+            <td class="cell-title"><span class="cell-primary">${escapeHtml(dept.name)}</span></td>
+            <td data-label="Location">${escapeHtml(dept.floor || '–')}</td>
+            <td data-label="Timings">${escapeHtml(dept.timings || '–')}</td>
+            <td data-label="Contact">${escapeHtml(dept.contact || '–')}</td>
+            ${actionButtons('department', dept, dept.name, { edit: false })}
+        </tr>`,
+};
+
+function showDepartmentModal() {
+    $('departmentForm').reset();
+    openDialog('departmentModal');
+}
+
+async function saveDepartment(e) {
+    e.preventDefault();
+    const form = e.target;
+    if (!validateForm(form)) return;
+    const data = new FormData(form);
+    const department = {
+        name: data.get('name').trim(),
+        floor: data.get('floor').trim(),
+        timings: data.get('timings').trim(),
+        contact: data.get('contact').trim(),
+    };
+    await saveItem({
+        button: e.submitter,
+        url: '/api/admin/departments',
+        method: 'POST',
+        body: department,
+        dialog: 'departmentModal',
+        success: `Added ${department.name}`,
+        reload: () => loadCollection(departmentsView),
+    });
+}
+
+// ============================================================================
+// FAQS
+// ============================================================================
+
+const faqsView = {
+    key: 'faqs',
+    url: '/api/admin/faqs',
+    table: 'faqsTable',
+    stateEl: 'faqsState',
+    columns: 4,
+    countEl: 'faqsCount',
+    emptyTitle: 'No FAQs yet',
+    emptyText: 'FAQs are searched before every reply, so answers stay accurate to your hospital.',
+    emptyAction: 'Add FAQ',
+    onEmptyAction: () => showFaqModal(),
+    render: (faq) => `
+        <tr>
+            <td class="cell-title"><span class="cell-primary">${escapeHtml(faq.question)}</span>${faq.question_kn ? `<span class="cell-sub" lang="kn">${escapeHtml(faq.question_kn)}</span>` : ''}</td>
+            <td data-label="Answer"><span class="cell-clamp">${escapeHtml(faq.answer || '–')}</span></td>
+            <td data-label="Category"><span class="badge">${escapeHtml(faq.category || 'general')}</span></td>
+            ${actionButtons('faq', faq, faq.question)}
+        </tr>`,
+};
+
+function showFaqModal(faq = null) {
+    $('faqForm').reset();
+    $('faqModalTitle').textContent = faq ? 'Edit FAQ' : 'Add FAQ';
+    $('faqId').value = faq ? faq.id : '';
+    if (faq) {
+        $('faqQuestion').value = faq.question || '';
+        $('faqQuestionKn').value = faq.question_kn || '';
+        $('faqAnswer').value = faq.answer || '';
+        $('faqAnswerKn').value = faq.answer_kn || '';
+        $('faqCategory').value = faq.category || 'general';
+    }
+    openDialog('faqModal');
+}
+
+async function saveFaq(e) {
+    e.preventDefault();
+    const form = e.target;
+    if (!validateForm(form)) return;
+    const data = new FormData(form);
+    const faq = {
+        question: data.get('question').trim(),
+        question_kn: data.get('question_kn').trim(),
+        answer: data.get('answer').trim(),
+        answer_kn: data.get('answer_kn').trim(),
+        category: data.get('category'),
+    };
+    const id = data.get('id');
+    await saveItem({
+        button: e.submitter,
+        url: id ? `/api/admin/faqs/${encodeURIComponent(id)}` : '/api/admin/faqs',
+        method: id ? 'PUT' : 'POST',
+        body: faq,
+        dialog: 'faqModal',
+        success: id ? 'FAQ updated' : 'FAQ added',
+        reload: () => loadCollection(faqsView),
+    });
+}
+
+// ============================================================================
+// SHARED CRUD
+// ============================================================================
+
+async function saveItem({ button, url, method, body, dialog, success, reload }) {
+    setBusy(button, true);
+    try {
+        const response = await adminFetch(url, jsonRequest(method, body));
+        if (!response.ok) {
+            toast(await errorMessage(response, 'Couldn’t save. Please try again.'), 'error');
+            return;
+        }
+        closeDialog(dialog);
+        toast(success);
+        await reload();
+    } catch {
+        toast('Couldn’t reach the server. Please try again.', 'error');
+    } finally {
+        setBusy(button, false);
+    }
+}
+
+async function deleteItem({ url, label, success, reload }) {
+    const ok = await confirmDialog(`Delete ${label}?`, 'The assistant will stop using it straight away. This cannot be undone.');
+    if (!ok) return;
+    try {
+        const response = await adminFetch(url, { method: 'DELETE' });
+        if (!response.ok) {
+            toast(await errorMessage(response, 'Couldn’t delete. Please try again.'), 'error');
+            return;
+        }
+        toast(success);
+        await reload();
+    } catch {
+        toast('Couldn’t reach the server. Please try again.', 'error');
+    }
+}
+
+function setupTableActions() {
+    document.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-action]');
+        if (!btn) return;
+        const id = btn.dataset.id;
+        switch (btn.dataset.action) {
+            case 'edit-doctor':
+                showDoctorModal(state.doctors.find((d) => d.id === id));
+                break;
+            case 'delete-doctor': {
+                const doc = state.doctors.find((d) => d.id === id);
+                deleteItem({ url: `/api/admin/doctors/${encodeURIComponent(id)}`, label: doc ? doc.name : 'doctor', success: 'Doctor deleted', reload: () => loadCollection(doctorsView) });
+                break;
+            }
+            case 'delete-department': {
+                const dept = state.departments.find((d) => d.id === id);
+                deleteItem({ url: `/api/admin/departments/${encodeURIComponent(id)}`, label: dept ? dept.name : 'department', success: 'Department deleted', reload: () => loadCollection(departmentsView) });
+                break;
+            }
+            case 'edit-faq':
+                showFaqModal(state.faqs.find((f) => f.id === id));
+                break;
+            case 'delete-faq':
+                deleteItem({ url: `/api/admin/faqs/${encodeURIComponent(id)}`, label: 'this FAQ', success: 'FAQ deleted', reload: () => loadCollection(faqsView) });
+                break;
+        }
+    });
+}
+
+// ============================================================================
+// START
+// ============================================================================
+
+document.addEventListener('DOMContentLoaded', async () => {
+    initTabs();
+    setupDialogs();
+    setupLiveValidation();
+    setupTableActions();
+
+    $('settingsForm').addEventListener('submit', saveSettings);
+    $('resetSettings').addEventListener('click', () => {
+        populateSettingsForm(state.config);
+        toast('Changes discarded', 'info');
+    });
+    $('escalationForm').addEventListener('submit', saveEscalation);
+    $('doctorForm').addEventListener('submit', saveDoctor);
+    $('departmentForm').addEventListener('submit', saveDepartment);
+    $('faqForm').addEventListener('submit', saveFaq);
+    $('addDoctor').addEventListener('click', () => showDoctorModal());
+    $('addDepartment').addEventListener('click', () => showDepartmentModal());
+    $('addFaq').addEventListener('click', () => showFaqModal());
+    $('tokenButton').addEventListener('click', async () => {
+        if (getAdminToken()) {
+            setAdminToken('');
+            toast('Admin token forgotten for this tab', 'info');
+        } else {
+            const token = await requestToken(false);
+            if (token) {
+                setAdminToken(token);
+                toast('Token saved for this tab. It is checked on your next change.', 'info');
+            }
+        }
+    });
+
+    await loadHealth();
+    await Promise.all([loadSettings(), loadCollection(doctorsView), loadCollection(departmentsView), loadCollection(faqsView)]);
 });

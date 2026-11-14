@@ -1,133 +1,140 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Admin panel for configuring the hospital voice assistant: settings, doctors, departments and FAQs.">
+    <title>Admin · Apollo Voice AI</title>
+    <meta name="description" content="Admin panel for the hospital voice assistant: settings, doctors, departments, FAQs and escalation rules.">
     <meta name="robots" content="noindex">
     <meta name="theme-color" content="#1a56db">
-    <title>Apollo Hospital - Admin Panel</title>
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Ccircle cx='20' cy='20' r='18' fill='%231a56db'/%3E%3Cpath d='M20 8v24M12 20h16' stroke='%23fff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+    <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+    <link rel="stylesheet" href="/static/base.css">
     <link rel="stylesheet" href="/static/admin.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="/static/ui.js"></script>
 </head>
+
 <body>
-    <div class="admin-container">
-        <!-- Sidebar -->
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <div class="admin-shell">
+        <!-- Sidebar (top bar on small screens) -->
         <aside class="sidebar">
-            <div class="sidebar-header">
-                <div class="logo">
-                    <svg viewBox="0 0 40 40" class="logo-icon" aria-hidden="true">
-                        <circle cx="20" cy="20" r="18" fill="#1a56db" stroke="#fff" stroke-width="2"/>
-                        <path d="M20 8 L20 32 M12 20 L28 20" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
-                    </svg>
-                    <div class="logo-text">
-                        <h1>Apollo Hospital</h1>
-                        <span>Admin Panel</span>
-                    </div>
-                </div>
+            <div class="sidebar-top">
+                <a class="brand" href="/admin">
+                    <img src="/static/favicon.svg" alt="" width="32" height="32">
+                    <span class="brand-text">
+                        <span class="brand-name">Apollo Hospital</span>
+                        <span class="brand-sub">Admin panel</span>
+                    </span>
+                </a>
+                <button type="button" class="btn-icon theme-toggle" aria-label="Switch theme">
+                    <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                    <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+                </button>
             </div>
-            
-            <nav class="sidebar-nav">
-                <a href="#settings" class="nav-item active" data-tab="settings" aria-label="Settings">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="3"/>
-                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-                    </svg>
+
+            <nav class="sidebar-nav" aria-label="Admin sections">
+                <a href="#settings" class="nav-item" data-tab="settings">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg>
                     <span>Settings</span>
                 </a>
-                <a href="#doctors" class="nav-item" data-tab="doctors" aria-label="Doctors">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                        <circle cx="12" cy="7" r="4"/>
-                    </svg>
+                <a href="#doctors" class="nav-item" data-tab="doctors">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                     <span>Doctors</span>
+                    <span class="nav-count" id="doctorsCount" aria-label="doctors"></span>
                 </a>
-                <a href="#departments" class="nav-item" data-tab="departments" aria-label="Departments">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
-                        <polyline points="9 22 9 12 15 12 15 22"/>
-                    </svg>
+                <a href="#departments" class="nav-item" data-tab="departments">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg>
                     <span>Departments</span>
+                    <span class="nav-count" id="departmentsCount" aria-label="departments"></span>
                 </a>
-                <a href="#faqs" class="nav-item" data-tab="faqs" aria-label="FAQs">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="10"/>
-                        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
-                        <line x1="12" y1="17" x2="12.01" y2="17"/>
-                    </svg>
+                <a href="#faqs" class="nav-item" data-tab="faqs">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3M12 17h.01"/></svg>
                     <span>FAQs</span>
+                    <span class="nav-count" id="faqsCount" aria-label="FAQs"></span>
                 </a>
-                <a href="#escalation" class="nav-item" data-tab="escalation" aria-label="Escalation Rules">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-                        <line x1="12" y1="9" x2="12" y2="13"/>
-                        <line x1="12" y1="17" x2="12.01" y2="17"/>
-                    </svg>
-                    <span>Escalation Rules</span>
+                <a href="#escalation" class="nav-item" data-tab="escalation">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>
+                    <span>Escalation</span>
                 </a>
             </nav>
-            
+
             <div class="sidebar-footer">
-                <a href="/" class="back-link">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <line x1="19" y1="12" x2="5" y2="12"/>
-                        <polyline points="12 19 5 12 12 5"/>
-                    </svg>
-                    <span>Back to Voice AI</span>
+                <button type="button" class="btn btn-ghost btn-sm sidebar-btn" id="tokenButton" hidden>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                    <span id="tokenButtonText">Enter admin token</span>
+                </button>
+                <a href="/" class="btn btn-ghost btn-sm sidebar-btn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+                    <span>Back to assistant</span>
                 </a>
             </div>
         </aside>
-        
-        <!-- Main Content -->
-        <main class="main-content">
-            <!-- Settings Tab -->
-            <section id="settings" class="tab-content active">
-                <div class="content-header">
-                    <h2>General Settings</h2>
-                    <p>Configure the AI assistant behavior and hospital information</p>
+
+        <main id="main" class="admin-main" tabindex="-1">
+            <div class="alert alert-warning" id="redisNotice" role="status" hidden>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>
+                <div>
+                    <strong>Read-only mode: Redis is not connected</strong>
+                    <p>You are seeing the bundled sample data. Start Redis and run <code>python scripts/seed_data.py</code> to make changes.</p>
                 </div>
-                
-                <form id="settingsForm" class="settings-form">
-                    <div class="form-section">
-                        <h3>Hospital Information</h3>
+            </div>
+
+            <!-- ======================== SETTINGS ======================== -->
+            <section id="section-settings" class="tab-content" aria-labelledby="settingsTitle">
+                <header class="content-header">
+                    <div>
+                        <h1 id="settingsTitle">General settings</h1>
+                        <p>Hospital details and how the assistant behaves. Changes apply to the next question.</p>
+                    </div>
+                </header>
+
+                <form id="settingsForm" class="form-stack" novalidate>
+                    <fieldset class="card form-card">
+                        <legend class="card-title">Hospital information</legend>
                         <div class="form-grid">
-                            <div class="form-group">
-                                <label for="hospitalName">Hospital Name</label>
-                                <input type="text" id="hospitalName" name="hospital_name" value="Apollo Hospital">
+                            <div class="field">
+                                <label for="hospitalName">Hospital name<span class="required-mark" aria-hidden="true">*</span></label>
+                                <input class="input" type="text" id="hospitalName" name="hospital_name" required autocomplete="organization">
                             </div>
-                            <div class="form-group">
+                            <div class="field">
                                 <label for="city">City</label>
-                                <input type="text" id="city" name="city" value="Bengaluru">
+                                <input class="input" type="text" id="city" name="city" autocomplete="address-level2">
                             </div>
-                            <div class="form-group">
-                                <label for="emergencyNumber">Emergency Number</label>
-                                <input type="text" id="emergencyNumber" name="emergency_number" value="108">
+                            <div class="field">
+                                <label for="emergencyNumber">Emergency number<span class="required-mark" aria-hidden="true">*</span></label>
+                                <input class="input" type="tel" id="emergencyNumber" name="emergency_number" required inputmode="tel">
+                                <span class="field-hint">Shown on emergency alerts and spoken in urgent replies.</span>
                             </div>
-                            <div class="form-group">
+                            <div class="field">
                                 <label for="helpline">Helpline</label>
-                                <input type="text" id="helpline" name="helpline" value="1860-500-1066">
+                                <input class="input" type="tel" id="helpline" name="helpline" inputmode="tel">
                             </div>
                         </div>
-                    </div>
-                    
-                    <div class="form-section">
-                        <h3>AI Behavior</h3>
+                    </fieldset>
+
+                    <fieldset class="card form-card">
+                        <legend class="card-title">Assistant behaviour</legend>
                         <div class="form-grid">
-                            <div class="form-group">
-                                <label for="tone">Response Tone</label>
-                                <select id="tone" name="tone">
+                            <div class="field">
+                                <label for="tone">Response tone</label>
+                                <select class="select" id="tone" name="tone">
                                     <option value="formal">Formal</option>
                                     <option value="friendly">Friendly</option>
                                 </select>
                             </div>
-                            <div class="form-group">
-                                <label for="maxWords">Max Response Words</label>
-                                <input type="number" id="maxWords" name="max_words" value="50" min="20" max="200">
+                            <div class="field">
+                                <label for="maxWords">Max words per reply</label>
+                                <input class="input" type="number" id="maxWords" name="max_words" min="20" max="200" step="1" required aria-describedby="maxWordsHint">
+                                <span class="field-hint" id="maxWordsHint">Between 20 and 200.</span>
                             </div>
-                            <div class="form-group">
-                                <label for="primaryLanguage">Primary Language</label>
-                                <select id="primaryLanguage" name="primary_language">
+                            <div class="field">
+                                <label for="primaryLanguage">Primary language</label>
+                                <select class="select" id="primaryLanguage" name="primary_language">
                                     <option value="en">English</option>
                                     <option value="kn">Kannada</option>
                                     <option value="ta">Tamil</option>
@@ -135,322 +142,343 @@
                                     <option value="hi">Hindi</option>
                                 </select>
                             </div>
-                            <div class="form-group">
-                                <label for="sessionTimeout">Session Timeout (min)</label>
-                                <input type="number" id="sessionTimeout" name="session_timeout_minutes" value="30" min="5" max="120">
+                            <div class="field">
+                                <label for="sessionTimeout">Session timeout (minutes)</label>
+                                <input class="input" type="number" id="sessionTimeout" name="session_timeout_minutes" min="5" max="120" step="1" required aria-describedby="sessionTimeoutHint">
+                                <span class="field-hint" id="sessionTimeoutHint">Between 5 and 120.</span>
                             </div>
                         </div>
-                    </div>
-                    
-                    <div class="form-section">
-                        <h3>Options</h3>
                         <div class="checkbox-group">
-                            <label class="checkbox-label">
-                                <input type="checkbox" id="disclaimerRequired" name="disclaimer_required" checked>
-                                <span>Require Medical Disclaimer</span>
-                            </label>
-                            <label class="checkbox-label">
-                                <input type="checkbox" id="alwaysRecommendDoctor" name="always_recommend_doctor" checked>
-                                <span>Always Recommend Doctor Consultation</span>
-                            </label>
-                            <label class="checkbox-label">
-                                <input type="checkbox" id="ttsEnabled" name="tts_enabled" checked>
-                                <span>Enable Text-to-Speech</span>
-                            </label>
+                            <label class="checkbox"><input type="checkbox" id="disclaimerRequired" name="disclaimer_required"> Add a medical disclaimer to replies</label>
+                            <label class="checkbox"><input type="checkbox" id="alwaysRecommendDoctor" name="always_recommend_doctor"> Always recommend seeing a doctor</label>
+                            <label class="checkbox"><input type="checkbox" id="ttsEnabled" name="tts_enabled"> Enable spoken replies (text to speech)</label>
                         </div>
-                    </div>
-                    
-                    <div class="form-section">
-                        <h3>Custom Disclaimer</h3>
-                        <div class="form-group full-width">
-                            <textarea id="disclaimerText" name="disclaimer_text" rows="3">This is general information only. Please consult a doctor for medical advice.</textarea>
+                        <div class="field">
+                            <label for="disclaimerText">Disclaimer text</label>
+                            <textarea class="textarea" id="disclaimerText" name="disclaimer_text" rows="3"></textarea>
                         </div>
-                    </div>
-                    
+                    </fieldset>
+
                     <div class="form-actions">
-                        <button type="submit" class="btn btn-primary">Save Settings</button>
-                        <button type="button" class="btn btn-secondary" onclick="loadSettings()">Reset</button>
+                        <button type="button" class="btn btn-secondary" id="resetSettings">Discard changes</button>
+                        <button type="submit" class="btn btn-primary" data-requires-write>Save settings</button>
                     </div>
                 </form>
             </section>
-            
-            <!-- Doctors Tab -->
-            <section id="doctors" class="tab-content">
-                <div class="content-header">
-                    <h2>Manage Doctors</h2>
-                    <p>Add and manage doctor information for patient queries</p>
-                    <button class="btn btn-primary" onclick="showDoctorModal()">+ Add Doctor</button>
-                </div>
-                
-                <div class="data-table-container">
+
+            <!-- ======================== DOCTORS ======================== -->
+            <section id="section-doctors" class="tab-content" aria-labelledby="doctorsTitle" hidden>
+                <header class="content-header">
+                    <div>
+                        <h1 id="doctorsTitle">Doctors</h1>
+                        <p>Doctors the assistant can mention when patients ask who to see and when.</p>
+                    </div>
+                    <button type="button" class="btn btn-primary" id="addDoctor" data-requires-write>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+                        Add doctor
+                    </button>
+                </header>
+                <div class="card table-card">
                     <table class="data-table" id="doctorsTable">
+                        <caption class="visually-hidden">Doctors</caption>
                         <thead>
                             <tr>
-                                <th>Name</th>
-                                <th>Specialization</th>
-                                <th>Department</th>
-                                <th>Available Days</th>
-                                <th>Timings</th>
-                                <th>Actions</th>
+                                <th scope="col">Name</th>
+                                <th scope="col">Specialization</th>
+                                <th scope="col">Department</th>
+                                <th scope="col">Available days</th>
+                                <th scope="col">Timings</th>
+                                <th scope="col"><span class="visually-hidden">Actions</span></th>
                             </tr>
                         </thead>
-                        <tbody>
-                            <!-- Populated by JavaScript -->
-                        </tbody>
+                        <tbody></tbody>
                     </table>
-                    <div class="empty-state" id="doctorsEmpty">
-                        <p>No doctors added yet. Click "Add Doctor" to get started.</p>
-                    </div>
+                    <div class="table-state" id="doctorsState" aria-live="polite"></div>
                 </div>
             </section>
-            
-            <!-- Departments Tab -->
-            <section id="departments" class="tab-content">
-                <div class="content-header">
-                    <h2>Manage Departments</h2>
-                    <p>Add and manage department information</p>
-                    <button class="btn btn-primary" onclick="showDepartmentModal()">+ Add Department</button>
-                </div>
-                
-                <div class="data-table-container">
+
+            <!-- ====================== DEPARTMENTS ====================== -->
+            <section id="section-departments" class="tab-content" aria-labelledby="departmentsTitle" hidden>
+                <header class="content-header">
+                    <div>
+                        <h1 id="departmentsTitle">Departments</h1>
+                        <p>Where each department is, when it is open and how to reach it.</p>
+                    </div>
+                    <button type="button" class="btn btn-primary" id="addDepartment" data-requires-write>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+                        Add department
+                    </button>
+                </header>
+                <div class="card table-card">
                     <table class="data-table" id="departmentsTable">
+                        <caption class="visually-hidden">Departments</caption>
                         <thead>
                             <tr>
-                                <th>Name</th>
-                                <th>Floor</th>
-                                <th>Timings</th>
-                                <th>Contact</th>
-                                <th>Actions</th>
+                                <th scope="col">Name</th>
+                                <th scope="col">Floor / location</th>
+                                <th scope="col">Timings</th>
+                                <th scope="col">Contact</th>
+                                <th scope="col"><span class="visually-hidden">Actions</span></th>
                             </tr>
                         </thead>
-                        <tbody>
-                            <!-- Populated by JavaScript -->
-                        </tbody>
+                        <tbody></tbody>
                     </table>
-                    <div class="empty-state" id="departmentsEmpty">
-                        <p>No departments added yet. Click "Add Department" to get started.</p>
-                    </div>
+                    <div class="table-state" id="departmentsState" aria-live="polite"></div>
                 </div>
             </section>
-            
-            <!-- FAQs Tab -->
-            <section id="faqs" class="tab-content">
-                <div class="content-header">
-                    <h2>Manage FAQs</h2>
-                    <p>Add frequently asked questions for the AI to reference</p>
-                    <button class="btn btn-primary" onclick="showFaqModal()">+ Add FAQ</button>
-                </div>
-                
-                <div class="data-table-container">
+
+            <!-- ========================= FAQS ========================= -->
+            <section id="section-faqs" class="tab-content" aria-labelledby="faqsTitle" hidden>
+                <header class="content-header">
+                    <div>
+                        <h1 id="faqsTitle">FAQs</h1>
+                        <p>Questions and answers the assistant retrieves (RAG) before it replies.</p>
+                    </div>
+                    <button type="button" class="btn btn-primary" id="addFaq" data-requires-write>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+                        Add FAQ
+                    </button>
+                </header>
+                <div class="card table-card">
                     <table class="data-table" id="faqsTable">
+                        <caption class="visually-hidden">Frequently asked questions</caption>
                         <thead>
                             <tr>
-                                <th>Question</th>
-                                <th>Answer</th>
-                                <th>Category</th>
-                                <th>Actions</th>
+                                <th scope="col">Question</th>
+                                <th scope="col">Answer</th>
+                                <th scope="col">Category</th>
+                                <th scope="col"><span class="visually-hidden">Actions</span></th>
                             </tr>
                         </thead>
-                        <tbody>
-                            <!-- Populated by JavaScript -->
-                        </tbody>
+                        <tbody></tbody>
                     </table>
-                    <div class="empty-state" id="faqsEmpty">
-                        <p>No FAQs added yet. Click "Add FAQ" to get started.</p>
-                    </div>
+                    <div class="table-state" id="faqsState" aria-live="polite"></div>
                 </div>
             </section>
-            
-            <!-- Escalation Tab -->
-            <section id="escalation" class="tab-content">
-                <div class="content-header">
-                    <h2>Escalation Rules</h2>
-                    <p>Configure when to escalate queries to human agents</p>
-                </div>
-                
-                <form id="escalationForm" class="settings-form">
-                    <div class="form-section">
-                        <h3>Custom Escalation Keywords</h3>
-                        <p class="form-description">Add keywords that will trigger escalation to a human agent (one per line)</p>
-                        <div class="form-group full-width">
-                            <textarea id="escalationKeywords" name="escalation_keywords" rows="6" placeholder="Enter keywords, one per line..."></textarea>
-                        </div>
+
+            <!-- ====================== ESCALATION ====================== -->
+            <section id="section-escalation" class="tab-content" aria-labelledby="escalationTitle" hidden>
+                <header class="content-header">
+                    <div>
+                        <h1 id="escalationTitle">Escalation rules</h1>
+                        <p>When the assistant should stop and point the caller to emergency care or a human.</p>
                     </div>
-                    
-                    <div class="form-section">
-                        <h3>Default Escalation Rules</h3>
-                        <div class="rules-list">
-                            <div class="rule-item">
-                                <span class="rule-icon">1</span>
-                                <div class="rule-content">
-                                    <strong>Critical Symptoms</strong>
-                                    <p>Chest pain, heart attack, breathing difficulty, unconscious, seizure, stroke - Always escalate</p>
-                                </div>
-                            </div>
-                            <div class="rule-item">
-                                <span class="rule-icon">2</span>
-                                <div class="rule-content">
-                                    <strong>High Urgency + Medical Query</strong>
-                                    <p>Multiple urgency keywords with medical intent</p>
-                                </div>
-                            </div>
-                            <div class="rule-item">
-                                <span class="rule-icon">3</span>
-                                <div class="rule-content">
-                                    <strong>Low Confidence Recognition</strong>
-                                    <p>When speech recognition confidence is low on medical queries</p>
-                                </div>
-                            </div>
-                            <div class="rule-item">
-                                <span class="rule-icon">4</span>
-                                <div class="rule-content">
-                                    <strong>Repeated Queries</strong>
-                                    <p>User asks similar question multiple times (may be struggling)</p>
-                                </div>
-                            </div>
+                </header>
+
+                <form id="escalationForm" class="form-stack" novalidate>
+                    <fieldset class="card form-card">
+                        <legend class="card-title">Custom escalation keywords</legend>
+                        <div class="field">
+                            <label for="escalationKeywords">Keywords, one per line</label>
+                            <textarea class="textarea" id="escalationKeywords" name="escalation_keywords" rows="6" placeholder="dog bite&#10;snake bite&#10;severe burn" aria-describedby="escalationHint"></textarea>
+                            <span class="field-hint" id="escalationHint">Any question containing one of these words is escalated, in addition to the built-in rules below.</span>
                         </div>
+                    </fieldset>
+
+                    <div class="card form-card">
+                        <h2 class="card-title">Built-in rules</h2>
+                        <ol class="rules-list">
+                            <li class="rule-item">
+                                <strong>Critical symptoms</strong>
+                                <p>Chest pain, heart attack, breathing difficulty, unconsciousness, seizure, stroke and similar words in any supported language. Always escalated.</p>
+                            </li>
+                            <li class="rule-item">
+                                <strong>Chest or breathing complaints</strong>
+                                <p>Medical questions that mention the chest or breathing.</p>
+                            </li>
+                            <li class="rule-item">
+                                <strong>Low-confidence medical query</strong>
+                                <p>The question looks medical but the intent match is weak, so it needs clarification.</p>
+                            </li>
+                            <li class="rule-item">
+                                <strong>Several urgency cues</strong>
+                                <p>Multiple urgency keywords together with a medical question.</p>
+                            </li>
+                            <li class="rule-item">
+                                <strong>Repeated question</strong>
+                                <p>The caller asks the same thing again in one session, which may mean they are struggling.</p>
+                            </li>
+                        </ol>
                     </div>
-                    
+
                     <div class="form-actions">
-                        <button type="submit" class="btn btn-primary">Save Escalation Rules</button>
+                        <button type="submit" class="btn btn-primary" data-requires-write>Save keywords</button>
                     </div>
                 </form>
             </section>
         </main>
     </div>
-    
-    <!-- Doctor Modal -->
-    <div class="modal" id="doctorModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3 id="doctorModalTitle">Add Doctor</h3>
-                <button class="modal-close" onclick="closeModal('doctorModal')">&times;</button>
+
+    <!-- ========================= DIALOGS ========================= -->
+
+    <dialog class="dialog" id="doctorModal" aria-labelledby="doctorModalTitle">
+        <form id="doctorForm" method="dialog" novalidate>
+            <div class="dialog-header">
+                <h2 id="doctorModalTitle">Add doctor</h2>
+                <button type="button" class="btn-icon" data-close aria-label="Close">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                </button>
             </div>
-            <form id="doctorForm">
+            <div class="dialog-body">
                 <input type="hidden" id="doctorId" name="id">
                 <div class="form-grid">
-                    <div class="form-group">
-                        <label for="doctorName">Name *</label>
-                        <input type="text" id="doctorName" name="name" required>
+                    <div class="field">
+                        <label for="doctorName">Name<span class="required-mark" aria-hidden="true">*</span></label>
+                        <input class="input" type="text" id="doctorName" name="name" required maxlength="120" placeholder="Dr. Priya Sharma">
                     </div>
-                    <div class="form-group">
-                        <label for="doctorNameKn">Name (Kannada)</label>
-                        <input type="text" id="doctorNameKn" name="name_kn" placeholder="ಕನ್ನಡ ಹೆಸರು">
+                    <div class="field">
+                        <label for="doctorNameKn">Name in Kannada</label>
+                        <input class="input" type="text" id="doctorNameKn" name="name_kn" maxlength="120" lang="kn" placeholder="ಡಾ. ಪ್ರಿಯಾ ಶರ್ಮಾ">
                     </div>
-                    <div class="form-group">
-                        <label for="doctorSpec">Specialization *</label>
-                        <input type="text" id="doctorSpec" name="specialization" required>
+                    <div class="field">
+                        <label for="doctorSpec">Specialization<span class="required-mark" aria-hidden="true">*</span></label>
+                        <input class="input" type="text" id="doctorSpec" name="specialization" required maxlength="120" placeholder="Cardiologist">
                     </div>
-                    <div class="form-group">
-                        <label for="doctorDept">Department *</label>
-                        <input type="text" id="doctorDept" name="department" required>
+                    <div class="field">
+                        <label for="doctorDept">Department<span class="required-mark" aria-hidden="true">*</span></label>
+                        <input class="input" type="text" id="doctorDept" name="department" required maxlength="120" list="departmentOptions" placeholder="Cardiology">
+                        <datalist id="departmentOptions"></datalist>
                     </div>
-                    <div class="form-group">
+                    <div class="field">
                         <label for="doctorTimings">Timings</label>
-                        <input type="text" id="doctorTimings" name="timings" placeholder="9:00 AM - 5:00 PM">
-                    </div>
-                    <div class="form-group">
-                        <label>Available Days</label>
-                        <div class="days-checkboxes">
-                            <label><input type="checkbox" name="available_days" value="Monday"> Mon</label>
-                            <label><input type="checkbox" name="available_days" value="Tuesday"> Tue</label>
-                            <label><input type="checkbox" name="available_days" value="Wednesday"> Wed</label>
-                            <label><input type="checkbox" name="available_days" value="Thursday"> Thu</label>
-                            <label><input type="checkbox" name="available_days" value="Friday"> Fri</label>
-                            <label><input type="checkbox" name="available_days" value="Saturday"> Sat</label>
-                            <label><input type="checkbox" name="available_days" value="Sunday"> Sun</label>
-                        </div>
+                        <input class="input" type="text" id="doctorTimings" name="timings" maxlength="80" placeholder="9:00 AM - 5:00 PM">
                     </div>
                 </div>
-                <div class="modal-actions">
-                    <button type="button" class="btn btn-secondary" onclick="closeModal('doctorModal')">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Save Doctor</button>
-                </div>
-            </form>
-        </div>
-    </div>
-    
-    <!-- Department Modal -->
-    <div class="modal" id="departmentModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3 id="departmentModalTitle">Add Department</h3>
-                <button class="modal-close" onclick="closeModal('departmentModal')">&times;</button>
+                <fieldset class="field">
+                    <legend class="field-label">Available days</legend>
+                    <div class="days-checkboxes">
+                        <label class="day-chip"><input type="checkbox" name="available_days" value="Monday"><span>Mon</span></label>
+                        <label class="day-chip"><input type="checkbox" name="available_days" value="Tuesday"><span>Tue</span></label>
+                        <label class="day-chip"><input type="checkbox" name="available_days" value="Wednesday"><span>Wed</span></label>
+                        <label class="day-chip"><input type="checkbox" name="available_days" value="Thursday"><span>Thu</span></label>
+                        <label class="day-chip"><input type="checkbox" name="available_days" value="Friday"><span>Fri</span></label>
+                        <label class="day-chip"><input type="checkbox" name="available_days" value="Saturday"><span>Sat</span></label>
+                        <label class="day-chip"><input type="checkbox" name="available_days" value="Sunday"><span>Sun</span></label>
+                    </div>
+                </fieldset>
             </div>
-            <form id="departmentForm">
-                <input type="hidden" id="departmentId" name="id">
+            <div class="dialog-footer">
+                <button type="button" class="btn btn-secondary" data-close>Cancel</button>
+                <button type="submit" class="btn btn-primary">Save doctor</button>
+            </div>
+        </form>
+    </dialog>
+
+    <dialog class="dialog" id="departmentModal" aria-labelledby="departmentModalTitle">
+        <form id="departmentForm" method="dialog" novalidate>
+            <div class="dialog-header">
+                <h2 id="departmentModalTitle">Add department</h2>
+                <button type="button" class="btn-icon" data-close aria-label="Close">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div class="dialog-body">
                 <div class="form-grid">
-                    <div class="form-group">
-                        <label for="deptName">Name *</label>
-                        <input type="text" id="deptName" name="name" required>
+                    <div class="field">
+                        <label for="deptName">Name<span class="required-mark" aria-hidden="true">*</span></label>
+                        <input class="input" type="text" id="deptName" name="name" required maxlength="120" placeholder="Cardiology">
                     </div>
-                    <div class="form-group">
-                        <label for="deptFloor">Floor/Location *</label>
-                        <input type="text" id="deptFloor" name="floor" required>
+                    <div class="field">
+                        <label for="deptFloor">Floor / location<span class="required-mark" aria-hidden="true">*</span></label>
+                        <input class="input" type="text" id="deptFloor" name="floor" required maxlength="120" placeholder="2nd floor, Block A">
                     </div>
-                    <div class="form-group">
+                    <div class="field">
                         <label for="deptTimings">Timings</label>
-                        <input type="text" id="deptTimings" name="timings" placeholder="8:00 AM - 8:00 PM">
+                        <input class="input" type="text" id="deptTimings" name="timings" maxlength="80" placeholder="8:00 AM - 8:00 PM">
                     </div>
-                    <div class="form-group">
+                    <div class="field">
                         <label for="deptContact">Contact</label>
-                        <input type="text" id="deptContact" name="contact" placeholder="080-XXXX-XXXX">
+                        <input class="input" type="tel" id="deptContact" name="contact" maxlength="40" placeholder="080-XXXX-XXXX">
                     </div>
                 </div>
-                <div class="modal-actions">
-                    <button type="button" class="btn btn-secondary" onclick="closeModal('departmentModal')">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Save Department</button>
-                </div>
-            </form>
-        </div>
-    </div>
-    
-    <!-- FAQ Modal -->
-    <div class="modal" id="faqModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3 id="faqModalTitle">Add FAQ</h3>
-                <button class="modal-close" onclick="closeModal('faqModal')">&times;</button>
             </div>
-            <form id="faqForm">
+            <div class="dialog-footer">
+                <button type="button" class="btn btn-secondary" data-close>Cancel</button>
+                <button type="submit" class="btn btn-primary">Save department</button>
+            </div>
+        </form>
+    </dialog>
+
+    <dialog class="dialog" id="faqModal" aria-labelledby="faqModalTitle">
+        <form id="faqForm" method="dialog" novalidate>
+            <div class="dialog-header">
+                <h2 id="faqModalTitle">Add FAQ</h2>
+                <button type="button" class="btn-icon" data-close aria-label="Close">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div class="dialog-body">
                 <input type="hidden" id="faqId" name="id">
-                <div class="form-group full-width">
-                    <label for="faqQuestion">Question (English) *</label>
-                    <input type="text" id="faqQuestion" name="question" required>
+                <div class="field">
+                    <label for="faqQuestion">Question (English)<span class="required-mark" aria-hidden="true">*</span></label>
+                    <input class="input" type="text" id="faqQuestion" name="question" required maxlength="300" placeholder="Where is the pharmacy?">
                 </div>
-                <div class="form-group full-width">
+                <div class="field">
+                    <label for="faqAnswer">Answer (English)<span class="required-mark" aria-hidden="true">*</span></label>
+                    <textarea class="textarea" id="faqAnswer" name="answer" rows="3" required maxlength="2000"></textarea>
+                </div>
+                <div class="field">
                     <label for="faqQuestionKn">Question (Kannada)</label>
-                    <input type="text" id="faqQuestionKn" name="question_kn" placeholder="ಕನ್ನಡ ಪ್ರಶ್ನೆ">
+                    <input class="input" type="text" id="faqQuestionKn" name="question_kn" maxlength="300" lang="kn" placeholder="ಔಷಧಾಲಯ ಎಲ್ಲಿದೆ?">
                 </div>
-                <div class="form-group full-width">
-                    <label for="faqAnswer">Answer (English) *</label>
-                    <textarea id="faqAnswer" name="answer" rows="3" required></textarea>
-                </div>
-                <div class="form-group full-width">
+                <div class="field">
                     <label for="faqAnswerKn">Answer (Kannada)</label>
-                    <textarea id="faqAnswerKn" name="answer_kn" rows="3" placeholder="ಕನ್ನಡ ಉತ್ತರ"></textarea>
+                    <textarea class="textarea" id="faqAnswerKn" name="answer_kn" rows="3" maxlength="2000" lang="kn"></textarea>
                 </div>
-                <div class="form-group">
+                <div class="field">
                     <label for="faqCategory">Category</label>
-                    <select id="faqCategory" name="category">
+                    <select class="select" id="faqCategory" name="category">
                         <option value="general">General</option>
                         <option value="appointment">Appointment</option>
                         <option value="billing">Billing</option>
                         <option value="emergency">Emergency</option>
-                        <option value="visiting">Visiting Hours</option>
+                        <option value="visiting">Visiting hours</option>
                     </select>
                 </div>
-                <div class="modal-actions">
-                    <button type="button" class="btn btn-secondary" onclick="closeModal('faqModal')">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Save FAQ</button>
+            </div>
+            <div class="dialog-footer">
+                <button type="button" class="btn btn-secondary" data-close>Cancel</button>
+                <button type="submit" class="btn btn-primary">Save FAQ</button>
+            </div>
+        </form>
+    </dialog>
+
+    <dialog class="dialog dialog-sm" id="tokenModal" aria-labelledby="tokenModalTitle">
+        <form id="tokenForm" method="dialog" novalidate>
+            <div class="dialog-header">
+                <h2 id="tokenModalTitle">Admin token required</h2>
+            </div>
+            <div class="dialog-body">
+                <p>Changes are protected. Enter the <code>ADMIN_TOKEN</code> configured on the server. It is kept only for this browser tab.</p>
+                <div class="field">
+                    <label for="tokenInput">Admin token</label>
+                    <input class="input" type="password" id="tokenInput" name="token" required autocomplete="current-password">
                 </div>
-            </form>
-        </div>
-    </div>
-    
-    <!-- Toast Notification -->
-    <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    
-    <script src="/static/admin.js"></script>
+            </div>
+            <div class="dialog-footer">
+                <button type="button" class="btn btn-secondary" data-close>Cancel</button>
+                <button type="submit" class="btn btn-primary">Continue</button>
+            </div>
+        </form>
+    </dialog>
+
+    <dialog class="dialog dialog-sm" id="confirmModal" aria-labelledby="confirmTitle" aria-describedby="confirmText">
+        <form method="dialog">
+            <div class="dialog-header">
+                <h2 id="confirmTitle">Delete item?</h2>
+            </div>
+            <div class="dialog-body">
+                <p id="confirmText">This cannot be undone.</p>
+            </div>
+            <div class="dialog-footer">
+                <button type="submit" class="btn btn-secondary" value="cancel" autofocus>Cancel</button>
+                <button type="submit" class="btn btn-danger" value="confirm">Delete</button>
+            </div>
+        </form>
+    </dialog>
+
+    <div class="toast-region" id="toastRegion"></div>
+    <script src="/static/admin.js" defer></script>
 </body>
+
 </html>
