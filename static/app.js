@@ -1,1006 +1,926 @@
 /**
- * Apollo Hospital Voice AI Assistant v2.0
- * Frontend JavaScript for audio recording, processing, and UI updates
- * 
- * v2.0 Features:
- * - Session management with session_id
- * - Context display showing patient info
- * - RAG/context indicators
+ * Apollo Voice AI Assistant: frontend for the Ask and Live call modes.
+ *
+ * Ask:       hold-to-record (pointer or keyboard) or upload a file, POST /process,
+ *            render the transcript, reply, pipeline latencies and signals.
+ * Live call: WebSocket /ws/call streaming PCM16 both ways.
  */
 
-// ============================================================================
-// STATE
-// ============================================================================
+const LANGUAGE_NAMES = { en: 'English', kn: 'Kannada', ta: 'Tamil', te: 'Telugu', hi: 'Hindi' };
+const PIPER_LANGUAGES = ['en', 'hi', 'te'];
+const PIPELINE_STAGES = ['vad', 'stt', 'language_detection', 'layer1_signals', 'safety_gate', 'policy', 'llm', 'tts'];
+const MIN_RECORDING_MS = 400;
+const SESSION_KEY = 'apollo_session_id';
 
 const state = {
     isRecording: false,
-    mediaRecorder: null,
-    audioChunks: [],
     isProcessing: false,
     serverReady: false,
-    sessionId: null
+    mediaRecorder: null,
+    audioChunks: [],
+    recordStartedAt: 0,
+    stopRequested: false,
+    sessionId: null,
+    maxUploadBytes: 10 * 1024 * 1024,
+    stageTimers: [],
 };
 
-// ============================================================================
-// DOM ELEMENTS
-// ============================================================================
+const $ = (id) => document.getElementById(id);
 
-const elements = {
-    statusIndicator: document.getElementById('statusIndicator'),
-    languageSelect: document.getElementById('languageSelect'),
-    ttsToggle: document.getElementById('ttsToggle'),
-    micButton: document.getElementById('micButton'),
-    recordingIndicator: document.getElementById('recordingIndicator'),
-    uploadButton: document.getElementById('uploadButton'),
-    audioUpload: document.getElementById('audioUpload'),
-    fileName: document.getElementById('fileName'),
-    pipelineSection: document.getElementById('pipelineSection'),
-    totalLatency: document.getElementById('totalLatency'),
-    escalationAlert: document.getElementById('escalationAlert'),
-    escalationReason: document.getElementById('escalationReason'),
-    conversationSection: document.getElementById('conversationSection'),
-    conversationContainer: document.getElementById('conversationContainer'),
-    audioPlayerSection: document.getElementById('audioPlayerSection'),
-    responseAudio: document.getElementById('responseAudio'),
-    signalsSection: document.getElementById('signalsSection'),
-    signalIntent: document.getElementById('signalIntent'),
-    signalUrgency: document.getElementById('signalUrgency'),
-    signalTone: document.getElementById('signalTone'),
-    signalLanguage: document.getElementById('signalLanguage'),
-    // New elements for session/context (may not exist in old HTML)
-    sessionInfo: document.getElementById('sessionInfo'),
-    contextInfo: document.getElementById('contextInfo')
+const el = {
+    status: $('statusIndicator'),
+    notice: $('serviceNotice'),
+    noticeTitle: $('serviceNoticeTitle'),
+    noticeText: $('serviceNoticeText'),
+    languageSelect: $('languageSelect'),
+    ttsToggle: $('ttsToggle'),
+    micButton: $('micButton'),
+    micLabel: $('micLabel'),
+    micHint: $('micHint'),
+    uploadButton: $('uploadButton'),
+    audioUpload: $('audioUpload'),
+    fileName: $('fileName'),
+    newSessionBtn: $('newSessionBtn'),
+    totalLatency: document.querySelector('#totalLatency .latency-value'),
+    escalationAlert: $('escalationAlert'),
+    escalationReason: $('escalationReason'),
+    emergencyNumber: $('emergencyNumber'),
+    emergencyCall: $('emergencyCall'),
+    conversation: $('conversationContainer'),
+    audioPlayer: $('audioPlayerSection'),
+    responseAudio: $('responseAudio'),
+    signals: $('signalsSection'),
+    signalIntent: $('signalIntent'),
+    signalUrgency: $('signalUrgency'),
+    signalTone: $('signalTone'),
+    signalLanguage: $('signalLanguage'),
+    contextBadges: $('contextIndicators'),
 };
 
+const toast = (message, type) => window.ui.toast(message, type);
+
 // ============================================================================
-// INITIALIZATION
+// SERVER STATUS
 // ============================================================================
 
-async function init() {
-    // Check server health
-    await checkServerHealth();
+function setStatus(kind, text) {
+    el.status.dataset.state = kind;
+    el.status.querySelector('.status-text').textContent = text;
+}
 
-    // Set up event listeners
-    setupEventListeners();
+function showNotice(title, text, tone = 'warning') {
+    el.notice.className = `alert alert-${tone}`;
+    el.noticeTitle.textContent = title;
+    el.noticeText.textContent = text;
+    el.notice.hidden = false;
+}
 
-    // Check for microphone permissions
-    await checkMicrophonePermission();
-
-    // Initialize or restore session
-    await initSession();
+function setInputsEnabled(enabled) {
+    el.micButton.disabled = !enabled;
+    el.uploadButton.disabled = !enabled;
+    if (callManager) callManager.setAvailable(enabled);
 }
 
 async function checkServerHealth() {
+    let data;
     try {
-        const response = await fetch('/health');
-        const data = await response.json();
-
-        if (data.status === 'healthy') {
-            state.serverReady = true;
-            updateStatus('ready', 'Ready');
-
-            // Show additional info
-            console.log('Server status:', data);
-            console.log('Redis connected:', data.redis_connected);
-            console.log('RAG ready:', data.rag_ready);
-        } else if (data.status === 'error') {
-            updateStatus('error', 'Model loading failed - check server logs');
-        } else {
-            updateStatus('loading', 'Loading models...');
-            // Poll until ready
-            setTimeout(checkServerHealth, 3000);
-        }
-    } catch (error) {
-        updateStatus('error', 'Server unavailable');
+        const response = await fetch('/health', { cache: 'no-store' });
+        data = await response.json();
+    } catch {
+        state.serverReady = false;
+        setInputsEnabled(false);
+        setStatus('error', 'Offline');
+        setMicHint('Cannot reach the server. Retrying…');
+        showNotice('Server unavailable', 'The assistant server is not responding. This page will reconnect automatically.', 'danger');
         setTimeout(checkServerHealth, 5000);
+        return;
     }
-}
 
-function updateStatus(status, text) {
-    const indicator = elements.statusIndicator;
-    if (indicator) {
-        indicator.className = `status-indicator ${status}`;
-        const statusText = indicator.querySelector('.status-text');
-        if (statusText) {
-            statusText.textContent = text;
+    if (data.max_upload_mb) state.maxUploadBytes = data.max_upload_mb * 1024 * 1024;
+    if (el.fileName && !el.fileName.dataset.file) {
+        el.fileName.textContent = `WAV, WebM, MP3 or OGG · up to ${data.max_upload_mb || 10} MB`;
+    }
+
+    if (data.status === 'healthy') {
+        const wasReady = state.serverReady;
+        state.serverReady = true;
+        setInputsEnabled(true);
+        setStatus('ready', 'Ready');
+        setMicHint(defaultMicHint());
+        if (!data.llm_configured) {
+            showNotice(
+                'Running without an LLM key',
+                'GEMINI_API_KEY is not set, so replies use a fixed fallback message. Speech recognition and signals still work.',
+                'info',
+            );
+        } else {
+            el.notice.hidden = true;
         }
+        if (!wasReady && data.piper_languages && data.piper_languages.length === 0) {
+            el.ttsToggle.disabled = true;
+            $('ttsHint').textContent = 'Piper voices not installed (see README)';
+        }
+        return;
     }
+
+    state.serverReady = false;
+    setInputsEnabled(false);
+
+    if (data.status === 'error') {
+        setStatus('error', 'Models failed');
+        setMicHint('Speech is unavailable.');
+        showNotice('Speech models failed to load', 'Check the server logs. The admin panel still works.', 'danger');
+        return;
+    }
+
+    if (data.speech_enabled === false) {
+        setStatus('disabled', 'Speech off');
+        setMicHint('Speech is turned off on this server.');
+        showNotice(
+            'Speech pipeline is turned off',
+            'The server was started with LOAD_MODELS=false, so recording and calls are unavailable. The admin panel and APIs still work.',
+            'info',
+        );
+        return;
+    }
+
+    setStatus('loading', 'Loading models…');
+    setMicHint('Loading speech models…');
+    showNotice(
+        'Speech models are loading',
+        'The first start downloads models and can take a few minutes. This page updates automatically.',
+    );
+    setTimeout(checkServerHealth, 3000);
 }
 
-async function checkMicrophonePermission() {
+async function loadEmergencyNumber() {
     try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        stream.getTracks().forEach(track => track.stop());
-    } catch (error) {
-        console.warn('Microphone permission not granted:', error);
+        const response = await fetch('/api/admin/config');
+        if (!response.ok) return;
+        const config = await response.json();
+        const number = String(config.emergency_number || '').trim();
+        if (number) {
+            el.emergencyNumber.textContent = number;
+            el.emergencyCall.href = `tel:${number.replace(/[^\d+]/g, '')}`;
+            document.querySelectorAll('.disclaimer strong').forEach((n) => (n.textContent = number));
+        }
+    } catch {
+        /* keep the default 108 */
     }
 }
 
 // ============================================================================
-// SESSION MANAGEMENT
+// SESSION
 // ============================================================================
+
+function storage(action, value) {
+    try {
+        if (action === 'get') return sessionStorage.getItem(SESSION_KEY);
+        if (action === 'set') sessionStorage.setItem(SESSION_KEY, value);
+        if (action === 'remove') sessionStorage.removeItem(SESSION_KEY);
+    } catch {
+        /* storage unavailable: the session lives only in memory */
+    }
+    return null;
+}
 
 async function initSession() {
-    // Check if we have a session in sessionStorage
-    const storedSessionId = sessionStorage.getItem('apollo_session_id');
-
-    if (storedSessionId) {
-        // Validate the session still exists on server
+    const stored = storage('get');
+    if (stored) {
         try {
-            const response = await fetch(`/api/session/${storedSessionId}`);
+            const response = await fetch(`/api/session/${encodeURIComponent(stored)}`);
             if (response.ok) {
-                state.sessionId = storedSessionId;
-                console.log('Restored session:', state.sessionId);
-                updateSessionDisplay();
+                state.sessionId = stored;
+                restoreHistory(await response.json());
+                el.newSessionBtn.disabled = false;
                 return;
             }
-        } catch (error) {
-            console.log('Session expired, creating new one');
+        } catch {
+            /* fall through and create a new session */
         }
     }
-
-    // Create new session
-    await createNewSession();
+    await createSession();
 }
 
-async function createNewSession() {
+async function createSession() {
     try {
         const response = await fetch('/api/session', { method: 'POST' });
         const data = await response.json();
-
         state.sessionId = data.session_id;
-        sessionStorage.setItem('apollo_session_id', state.sessionId);
-
-        console.log('Created new session:', state.sessionId);
-        updateSessionDisplay();
-    } catch (error) {
-        console.error('Failed to create session:', error);
-        // Generate a local session ID as fallback
-        state.sessionId = 'local_' + Math.random().toString(36).substring(2, 10);
+        storage('set', state.sessionId);
+    } catch {
+        state.sessionId = null; // /process creates one on the first request
     }
+    el.newSessionBtn.disabled = false;
 }
 
-function updateSessionDisplay() {
-    // Update session info display if element exists
-    if (elements.sessionInfo) {
-        elements.sessionInfo.textContent = `Session: ${state.sessionId}`;
-    }
-}
-
-function clearSession() {
-    sessionStorage.removeItem('apollo_session_id');
-    state.sessionId = null;
-    createNewSession();
-
-    // Clear conversation display
-    if (elements.conversationContainer) {
-        elements.conversationContainer.innerHTML = `
-            <div class="empty-state">
-                <p>Start speaking to begin the conversation</p>
-            </div>
-        `;
-    }
-
-    // Hide context
-    if (elements.contextInfo) {
-        elements.contextInfo.hidden = true;
-    }
-}
-
-// ============================================================================
-// EVENT LISTENERS
-// ============================================================================
-
-function setupEventListeners() {
-    // Microphone button - press and hold
-    if (elements.micButton) {
-        elements.micButton.addEventListener('mousedown', startRecording);
-        elements.micButton.addEventListener('mouseup', stopRecording);
-        elements.micButton.addEventListener('mouseleave', stopRecording);
-
-        // Touch events for mobile
-        elements.micButton.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            startRecording();
-        });
-        elements.micButton.addEventListener('touchend', (e) => {
-            e.preventDefault();
-            stopRecording();
-        });
-    }
-
-    // Upload button
-    if (elements.uploadButton) {
-        elements.uploadButton.addEventListener('click', () => {
-            elements.audioUpload.click();
-        });
-    }
-
-    // File input change
-    if (elements.audioUpload) {
-        elements.audioUpload.addEventListener('change', handleFileUpload);
-    }
-
-    const newSessionBtn = document.getElementById('newSessionBtn');
-    if (newSessionBtn) {
-        newSessionBtn.addEventListener('click', clearSession);
-    }
-
-    // TTS Toggle
-    if (elements.ttsToggle) {
-        elements.ttsToggle.addEventListener('change', handleTTSToggle);
-    }
-}
-
-function handleTTSToggle(e) {
-    const isPiper = e.target.checked;
-    const select = elements.languageSelect;
-
-    // Supported languages for Piper: English, Hindi, Telugu
-    const piperLangs = ['en', 'hi', 'te'];
-
-    // Iterate options and hide/show based on Piper support
-    for (let i = 0; i < select.options.length; i++) {
-        const option = select.options[i];
-        if (isPiper) {
-            if (!piperLangs.includes(option.value) && option.value !== '') {
-                option.hidden = true;
-                option.disabled = true;
-            }
-        } else {
-            option.hidden = false;
-            option.disabled = false;
+function restoreHistory(session) {
+    let history = session && session.history;
+    if (typeof history === 'string') {
+        try {
+            history = JSON.parse(history);
+        } catch {
+            history = [];
         }
     }
+    if (!Array.isArray(history) || history.length === 0) return;
+    const language = LANGUAGE_NAMES[session.language] || '';
+    history.forEach((turn) => addMessage(turn.role === 'user' ? 'user' : 'assistant', turn.text, language));
+}
 
-    // If currently selected language is not supported, switch to English
-    if (isPiper && !piperLangs.includes(select.value)) {
-        select.value = 'en';
-    }
+async function startNewConversation() {
+    storage('remove');
+    state.sessionId = null;
+    el.conversation.innerHTML = emptyStateHtml();
+    el.audioPlayer.hidden = true;
+    el.signals.hidden = true;
+    el.contextBadges.hidden = true;
+    hideEscalation();
+    resetPipeline();
+    await createSession();
+    toast('Started a new conversation', 'success');
+}
+
+function emptyStateHtml() {
+    return `
+        <div class="state-block empty-state">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            <h3>No messages yet</h3>
+            <p>Hold the microphone and ask something like “What are the OPD timings?” or “I have had a fever for two days.”</p>
+        </div>`;
 }
 
 // ============================================================================
-// RECORDING
+// RECORDING (press and hold: pointer, touch or Space/Enter)
 // ============================================================================
+
+function defaultMicHint() {
+    return 'Hold to talk, release to send. Keyboard: hold Space.';
+}
+
+function setMicHint(text, tone = '') {
+    el.micHint.textContent = text;
+    el.micHint.dataset.tone = tone;
+}
+
+function pickMimeType() {
+    if (typeof MediaRecorder === 'undefined' || !MediaRecorder.isTypeSupported) return '';
+    const candidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/mp4'];
+    return candidates.find((t) => MediaRecorder.isTypeSupported(t)) || '';
+}
+
+function extensionFor(mime) {
+    if (mime.includes('ogg')) return 'ogg';
+    if (mime.includes('mp4')) return 'm4a';
+    return 'webm';
+}
 
 async function startRecording() {
     if (state.isRecording || state.isProcessing || !state.serverReady) return;
-
-    try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-            audio: {
-                sampleRate: 16000,
-                channelCount: 1,
-                echoCancellation: true,
-                noiseSuppression: true
-            }
-        });
-
-        state.mediaRecorder = new MediaRecorder(stream, {
-            mimeType: 'audio/webm;codecs=opus'
-        });
-
-        state.audioChunks = [];
-
-        state.mediaRecorder.ondataavailable = (event) => {
-            if (event.data.size > 0) {
-                state.audioChunks.push(event.data);
-            }
-        };
-
-        state.mediaRecorder.onstop = async () => {
-            stream.getTracks().forEach(track => track.stop());
-
-            if (state.audioChunks.length > 0) {
-                const audioBlob = new Blob(state.audioChunks, { type: 'audio/webm' });
-                await processAudio(audioBlob);
-            }
-        };
-
-        state.mediaRecorder.start(100);
-        state.isRecording = true;
-
-        // Update UI
-        if (elements.micButton) {
-            elements.micButton.classList.add('recording');
-        }
-        if (elements.recordingIndicator) {
-            elements.recordingIndicator.classList.add('active');
-        }
-
-    } catch (error) {
-        console.error('Error starting recording:', error);
-        showError('Microphone access denied. Please allow microphone access.');
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        toast('Recording needs a secure page (HTTPS or localhost) and a browser with microphone support.', 'error');
+        return;
     }
+
+    state.isRecording = true;
+    state.stopRequested = false;
+    el.micButton.classList.add('recording');
+    el.micButton.setAttribute('aria-pressed', 'true');
+    setMicHint('Recording… release to send', 'recording');
+
+    let stream;
+    try {
+        stream = await navigator.mediaDevices.getUserMedia({
+            audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true },
+        });
+    } catch (error) {
+        resetRecordingUi();
+        const denied = error && (error.name === 'NotAllowedError' || error.name === 'SecurityError');
+        const message = denied
+            ? 'Microphone access was blocked. Allow it in your browser’s site settings and try again.'
+            : 'No microphone was found. Connect one, or upload an audio file instead.';
+        setMicHint(message);
+        toast(message, 'error');
+        return;
+    }
+
+    const mimeType = pickMimeType();
+    const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+    state.mediaRecorder = recorder;
+    state.audioChunks = [];
+    state.recordStartedAt = performance.now();
+
+    recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) state.audioChunks.push(event.data);
+    };
+    recorder.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        const duration = performance.now() - state.recordStartedAt;
+        const type = recorder.mimeType || mimeType || 'audio/webm';
+        if (duration < MIN_RECORDING_MS || state.audioChunks.length === 0) {
+            setMicHint('That was too short. Hold the button while you speak.');
+            return;
+        }
+        const blob = new Blob(state.audioChunks, { type });
+        await processAudio(blob, `recording.${extensionFor(type)}`);
+    };
+    recorder.start(100);
+
+    // The user may have released before the permission prompt resolved.
+    if (state.stopRequested) stopRecording();
 }
 
 function stopRecording() {
-    if (!state.isRecording || !state.mediaRecorder) return;
+    if (!state.isRecording) return;
+    if (!state.mediaRecorder) {
+        state.stopRequested = true;
+        return;
+    }
+    const recorder = state.mediaRecorder;
+    state.mediaRecorder = null;
+    resetRecordingUi();
+    if (recorder.state !== 'inactive') recorder.stop();
+}
 
+function resetRecordingUi() {
     state.isRecording = false;
-    state.mediaRecorder.stop();
+    el.micButton.classList.remove('recording');
+    el.micButton.setAttribute('aria-pressed', 'false');
+    if (!state.isProcessing) setMicHint(defaultMicHint());
+}
 
-    // Update UI
-    if (elements.micButton) {
-        elements.micButton.classList.remove('recording');
-    }
-    if (elements.recordingIndicator) {
-        elements.recordingIndicator.classList.remove('active');
-    }
+function setupMicButton() {
+    const mic = el.micButton;
+    mic.setAttribute('aria-pressed', 'false');
+
+    mic.addEventListener('pointerdown', (e) => {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        mic.setPointerCapture?.(e.pointerId);
+        startRecording();
+    });
+    ['pointerup', 'pointercancel'].forEach((type) => mic.addEventListener(type, stopRecording));
+    mic.addEventListener('contextmenu', (e) => e.preventDefault());
+
+    mic.addEventListener('keydown', (e) => {
+        if ((e.key === ' ' || e.key === 'Enter') && !e.repeat) {
+            e.preventDefault();
+            startRecording();
+        }
+    });
+    mic.addEventListener('keyup', (e) => {
+        if (e.key === ' ' || e.key === 'Enter') {
+            e.preventDefault();
+            stopRecording();
+        }
+    });
+    mic.addEventListener('blur', stopRecording);
 }
 
 // ============================================================================
-// FILE UPLOAD
+// UPLOAD
 // ============================================================================
 
 async function handleFileUpload(event) {
     const file = event.target.files[0];
+    event.target.value = '';
     if (!file) return;
 
-    if (elements.fileName) {
-        elements.fileName.textContent = file.name;
+    if (file.type && !file.type.startsWith('audio/') && file.type !== 'video/webm') {
+        toast(`“${file.name}” is not an audio file.`, 'error');
+        return;
     }
-    await processAudio(file);
+    if (file.size > state.maxUploadBytes) {
+        const mb = Math.round(state.maxUploadBytes / 1024 / 1024);
+        toast(`That file is ${(file.size / 1024 / 1024).toFixed(1)} MB. The limit is ${mb} MB.`, 'error');
+        return;
+    }
 
-    // Reset file input
-    event.target.value = '';
+    el.fileName.textContent = file.name;
+    el.fileName.dataset.file = '1';
+    await processAudio(file, file.name);
 }
 
 // ============================================================================
-// AUDIO PROCESSING
+// PROCESSING
 // ============================================================================
 
-async function processAudio(audioBlob) {
+function friendlyError(status, data) {
+    const detail = data && (data.error || (typeof data.detail === 'string' ? data.detail : ''));
+    if (detail === 'No speech detected in audio') return 'No speech was detected. Speak a little louder or closer to the microphone.';
+    if (detail === 'Could not transcribe audio') return 'Sorry, the audio could not be understood. Please try again.';
+    if (status === 413) return 'That recording is too large to upload.';
+    if (status === 503) return 'The speech models are still loading. Try again in a moment.';
+    if (status === 429) return 'Too many requests. Please wait a moment.';
+    if (status >= 500) return 'Something went wrong on the server. Please try again.';
+    return detail || 'Processing failed. Please try again.';
+}
+
+async function processAudio(blob, filename) {
     if (state.isProcessing) return;
-
     state.isProcessing = true;
-    updateStatus('processing', 'Processing...');
+    setStatus('processing', 'Processing…');
+    setMicHint('Working on your question…', 'processing');
+    el.micButton.classList.add('processing');
+    el.micButton.disabled = true;
+    el.uploadButton.disabled = true;
+    resetPipeline();
+    hideEscalation();
+    animatePipeline();
 
-    // Reset pipeline stages
-    resetPipelineStages();
-    hideEscalationAlert();
+    const form = new FormData();
+    form.append('audio', blob, filename);
+    form.append('language', el.languageSelect.value);
+    form.append('tts_provider', el.ttsToggle.checked ? 'piper' : 'edge');
+    if (state.sessionId) form.append('session_id', state.sessionId);
 
     try {
-        const formData = new FormData();
-        formData.append('audio', audioBlob, 'recording.webm');
-
-        // Add language if selected
-        const selectedLanguage = elements.languageSelect ? elements.languageSelect.value : '';
-        if (selectedLanguage) {
-            formData.append('language', selectedLanguage);
+        const response = await fetch('/process', { method: 'POST', body: form });
+        let data = null;
+        try {
+            data = await response.json();
+        } catch {
+            /* non-JSON error page */
         }
 
-        // Add TTS provider
-        const ttsProvider = elements.ttsToggle && elements.ttsToggle.checked ? 'piper' : 'edge';
-        formData.append('tts_provider', ttsProvider);
-
-        // Add session ID
-        if (state.sessionId) {
-            formData.append('session_id', state.sessionId);
-        }
-
-        // Show pipeline section
-        if (elements.pipelineSection) {
-            elements.pipelineSection.classList.add('active');
-        }
-
-        // Simulate pipeline progress
-        animatePipelineProgress();
-
-        const response = await fetch('/process', {
-            method: 'POST',
-            body: formData
-        });
-
-        const data = await response.json();
-
-        if (data.success) {
-            // Update session ID if server created one
+        if (response.ok && data && data.success) {
             if (data.session_id && data.session_id !== state.sessionId) {
                 state.sessionId = data.session_id;
-                sessionStorage.setItem('apollo_session_id', state.sessionId);
-                updateSessionDisplay();
+                storage('set', state.sessionId);
             }
-
-            handleSuccessResponse(data);
+            renderResult(data);
         } else {
-            showError(data.error || (typeof data.detail === 'string' ? data.detail : null) || 'Processing failed');
+            if (data && data.session_id) {
+                state.sessionId = data.session_id;
+                storage('set', state.sessionId);
+            }
+            resetPipeline(data && data.pipeline);
+            const message = friendlyError(response.status, data);
+            toast(message, 'error');
+            setMicHint(message);
         }
-
-    } catch (error) {
-        console.error('Error processing audio:', error);
-        showError('Failed to process audio. Please try again.');
+    } catch {
+        resetPipeline();
+        const message = 'Could not reach the server. Check your connection and try again.';
+        toast(message, 'error');
+        setMicHint(message);
     } finally {
         state.isProcessing = false;
-        updateStatus('ready', 'Ready');
+        el.micButton.classList.remove('processing');
+        if (state.serverReady) {
+            setStatus('ready', 'Ready');
+            el.micButton.disabled = false;
+            el.uploadButton.disabled = false;
+        }
+        if (el.micHint.dataset.tone === 'processing') setMicHint(defaultMicHint());
     }
 }
 
-function animatePipelineProgress() {
-    const stages = ['vad', 'stt', 'language_detection', 'layer1_signals', 'safety_gate', 'policy', 'llm', 'tts'];
+function stageEl(name) {
+    return document.querySelector(`.stage[data-stage="${name}"]`);
+}
 
-    stages.forEach((stage, index) => {
-        setTimeout(() => {
-            const stageEl = document.querySelector(`[data-stage="${stage}"]`);
-            if (stageEl) {
-                stageEl.classList.add('processing');
-            }
-        }, index * 200);
+function animatePipeline() {
+    PIPELINE_STAGES.forEach((name, i) => {
+        state.stageTimers.push(setTimeout(() => stageEl(name)?.classList.add('processing'), i * 220));
     });
 }
 
-function resetPipelineStages() {
-    document.querySelectorAll('.stage').forEach(stage => {
-        stage.classList.remove('processing', 'complete', 'error');
-        const latencyEl = stage.querySelector('.stage-latency');
-        if (latencyEl) {
-            latencyEl.textContent = '--';
-        }
+function resetPipeline(partial) {
+    state.stageTimers.forEach(clearTimeout);
+    state.stageTimers = [];
+    PIPELINE_STAGES.forEach((name) => {
+        const node = stageEl(name);
+        if (!node) return;
+        node.classList.remove('processing', 'complete', 'skipped');
+        const done = partial && partial[name];
+        if (done) node.classList.add('complete');
+        node.querySelector('.stage-latency').textContent = done ? `${Math.round(done.latency_ms)} ms` : '--';
     });
-
-    if (elements.totalLatency) {
-        const latencyValue = elements.totalLatency.querySelector('.latency-value');
-        if (latencyValue) {
-            latencyValue.textContent = '--';
-        }
-    }
+    el.totalLatency.textContent = '--';
 }
 
-// ============================================================================
-// RESPONSE HANDLING
-// ============================================================================
-
-function handleSuccessResponse(data) {
-    // Update pipeline stages with actual latencies
-    updatePipelineLatencies(data.pipeline);
-
-    // Update total latency
-    if (elements.totalLatency) {
-        const latencyValue = elements.totalLatency.querySelector('.latency-value');
-        if (latencyValue) {
-            latencyValue.textContent = `${data.total_latency_ms.toFixed(0)}ms`;
-        }
-    }
-
-    // Check for escalation
-    if (data.escalation && data.escalation.should_escalate) {
-        showEscalationAlert(data.escalation.reason);
-    }
-
-    // Add to conversation
-    addToConversation('user', data.transcription, data.language_name);
-    addToConversation('assistant', data.response, data.language_name);
-
-    // Play audio response
-    if (data.audio_response) {
-        playAudioResponse(data.audio_response, data.audio_format);
-    }
-
-    // Update signals
-    if (data.pipeline && data.pipeline.layer1_signals) {
-        updateSignals(data.pipeline.layer1_signals, data.language_name);
-    }
-
-    // Show context indicators
-    showContextIndicators(data.context);
-}
-
-function updatePipelineLatencies(pipeline) {
-    const stages = ['vad', 'stt', 'language_detection', 'layer1_signals', 'safety_gate', 'policy', 'llm', 'tts'];
-
-    stages.forEach(stage => {
-        const stageEl = document.querySelector(`[data-stage="${stage}"]`);
-        if (stageEl && pipeline[stage]) {
-            stageEl.classList.remove('processing');
-            stageEl.classList.add('complete');
-
-            const latencyEl = stageEl.querySelector('.stage-latency');
-            if (latencyEl) {
-                latencyEl.textContent = `${pipeline[stage].latency_ms.toFixed(0)}ms`;
-            }
-        }
+function renderResult(data) {
+    state.stageTimers.forEach(clearTimeout);
+    state.stageTimers = [];
+    PIPELINE_STAGES.forEach((name) => {
+        const node = stageEl(name);
+        const stage = data.pipeline && data.pipeline[name];
+        node.classList.remove('processing');
+        node.classList.add(stage ? 'complete' : 'skipped');
+        node.querySelector('.stage-latency').textContent = stage ? `${Math.round(stage.latency_ms)} ms` : 'skipped';
     });
+    el.totalLatency.textContent = `${Math.round(data.total_latency_ms)} ms`;
+
+    if (data.escalation && data.escalation.should_escalate) showEscalation(data.escalation.reason);
+
+    addMessage('user', data.transcription, data.language_name);
+    addMessage('assistant', data.response, data.language_name);
+
+    if (data.audio_response) playAudio(data.audio_response, data.audio_format);
+    if (data.pipeline && data.pipeline.layer1_signals) renderSignals(data.pipeline.layer1_signals, data.language_name);
+    renderContext(data.context);
 }
 
-function addToConversation(role, text, language) {
-    if (!elements.conversationContainer) return;
+function addMessage(role, text, language) {
+    el.conversation.querySelector('.empty-state')?.remove();
 
-    // Remove empty state if present
-    const emptyState = elements.conversationContainer.querySelector('.empty-state');
-    if (emptyState) {
-        emptyState.remove();
+    const wrap = document.createElement('div');
+    wrap.className = `message ${role}`;
+
+    const meta = document.createElement('div');
+    meta.className = 'message-meta';
+    const who = document.createElement('span');
+    who.textContent = role === 'user' ? 'You' : 'Apollo AI';
+    meta.appendChild(who);
+    if (language) {
+        const lang = document.createElement('span');
+        lang.className = 'message-language';
+        lang.textContent = language;
+        meta.appendChild(lang);
     }
 
-    const messageDiv = document.createElement('div');
-    messageDiv.className = `message ${role}`;
+    const body = document.createElement('p');
+    body.className = 'message-text';
+    body.textContent = text;
 
-    const labelSpan = document.createElement('span');
-    labelSpan.className = 'message-label';
-    labelSpan.textContent = role === 'user' ? 'You' : 'Apollo AI';
-
-    const langSpan = document.createElement('span');
-    langSpan.className = 'message-language';
-    langSpan.textContent = language;
-
-    const textP = document.createElement('p');
-    textP.className = 'message-text';
-    textP.textContent = text;
-
-    messageDiv.appendChild(labelSpan);
-    messageDiv.appendChild(langSpan);
-    messageDiv.appendChild(textP);
-
-    elements.conversationContainer.appendChild(messageDiv);
-    elements.conversationContainer.scrollTop = elements.conversationContainer.scrollHeight;
+    wrap.append(meta, body);
+    el.conversation.appendChild(wrap);
+    el.conversation.scrollTop = el.conversation.scrollHeight;
 }
 
 const AUDIO_MIME_TYPES = { mp3: 'audio/mpeg', wav: 'audio/wav' };
+let currentAudioUrl = null;
 
-function playAudioResponse(base64Audio, format = 'mp3') {
-    const audioBlob = base64ToBlob(base64Audio, AUDIO_MIME_TYPES[format] || 'audio/mpeg');
-    const audioUrl = URL.createObjectURL(audioBlob);
-
-    if (elements.responseAudio) {
-        elements.responseAudio.src = audioUrl;
-        if (elements.audioPlayerSection) {
-            elements.audioPlayerSection.hidden = false;
-        }
-        elements.responseAudio.play().catch((err) => {
-            // Autoplay can be blocked by the browser; the player stays visible for manual playback.
-            console.warn('Audio autoplay blocked:', err);
-        });
-    }
+function playAudio(base64Audio, format = 'mp3') {
+    const bytes = Uint8Array.from(atob(base64Audio), (c) => c.charCodeAt(0));
+    const blob = new Blob([bytes], { type: AUDIO_MIME_TYPES[format] || 'audio/mpeg' });
+    if (currentAudioUrl) URL.revokeObjectURL(currentAudioUrl);
+    currentAudioUrl = URL.createObjectURL(blob);
+    el.responseAudio.src = currentAudioUrl;
+    el.audioPlayer.hidden = false;
+    el.responseAudio.play().catch(() => {
+        /* autoplay blocked: the player stays visible for manual playback */
+    });
 }
 
-function base64ToBlob(base64, mimeType) {
-    const byteCharacters = atob(base64);
-    const byteNumbers = new Array(byteCharacters.length);
-
-    for (let i = 0; i < byteCharacters.length; i++) {
-        byteNumbers[i] = byteCharacters.charCodeAt(i);
-    }
-
-    const byteArray = new Uint8Array(byteNumbers);
-    return new Blob([byteArray], { type: mimeType });
+function renderSignals(signals, language) {
+    el.signals.hidden = false;
+    const set = (node, value) => {
+        node.textContent = String(value || '--').replace(/_/g, ' ');
+        node.className = `signal-value ${value || ''}`;
+    };
+    set(el.signalIntent, signals.intent);
+    set(el.signalUrgency, signals.urgency);
+    set(el.signalTone, signals.tone);
+    el.signalLanguage.textContent = language || '--';
 }
 
-function updateSignals(signals, language) {
-    if (elements.signalsSection) {
-        elements.signalsSection.hidden = false;
-    }
-
-    if (elements.signalIntent) {
-        elements.signalIntent.textContent = signals.intent;
-        elements.signalIntent.className = `signal-value ${signals.intent}`;
-    }
-
-    if (elements.signalUrgency) {
-        elements.signalUrgency.textContent = signals.urgency;
-        elements.signalUrgency.className = `signal-value ${signals.urgency}`;
-    }
-
-    if (elements.signalTone) {
-        elements.signalTone.textContent = signals.tone;
-        elements.signalTone.className = `signal-value ${signals.tone}`;
-    }
-
-    if (elements.signalLanguage) {
-        elements.signalLanguage.textContent = language;
-    }
-
-    // Show stress level if available
-    const stressEl = document.getElementById('signalStress');
-    if (stressEl && signals.stress_level) {
-        stressEl.textContent = signals.stress_level;
-        stressEl.className = `signal-value ${signals.stress_level}`;
-    }
-}
-
-function showContextIndicators(context) {
+function renderContext(context) {
+    el.contextBadges.replaceChildren();
     if (!context) return;
+    const badges = [];
+    if (context.used_rag) badges.push(['badge badge-primary', 'Answered from hospital FAQs']);
+    if (context.used_history) badges.push(['badge badge-success', 'Used earlier conversation']);
+    badges.forEach(([cls, text]) => {
+        const b = document.createElement('span');
+        b.className = cls;
+        b.textContent = text;
+        el.contextBadges.appendChild(b);
+    });
+    el.contextBadges.hidden = badges.length === 0;
+}
 
-    // Show indicators for RAG and history usage
-    const contextIndicators = document.getElementById('contextIndicators');
-    if (contextIndicators) {
-        let html = '';
+function showEscalation(reason) {
+    el.escalationReason.textContent = reason || 'Your message mentions symptoms that may need urgent care.';
+    el.escalationAlert.hidden = false;
+    el.escalationAlert.classList.add('shake');
+    setTimeout(() => el.escalationAlert.classList.remove('shake'), 500);
+}
 
-        if (context.used_rag) {
-            html += '<span class="context-badge rag">FAQ Matched</span>';
-        }
+function hideEscalation() {
+    el.escalationAlert.hidden = true;
+}
 
-        if (context.used_history) {
-            html += '<span class="context-badge history">Context Used</span>';
-        }
+// ============================================================================
+// SETTINGS
+// ============================================================================
 
-        contextIndicators.innerHTML = html;
-        contextIndicators.hidden = !html;
+function handleTtsToggle() {
+    const piper = el.ttsToggle.checked;
+    Array.from(el.languageSelect.options).forEach((option) => {
+        const unsupported = piper && !PIPER_LANGUAGES.includes(option.value);
+        option.disabled = unsupported;
+    });
+    if (piper && !PIPER_LANGUAGES.includes(el.languageSelect.value)) {
+        el.languageSelect.value = 'en';
+        toast('The fast local voice supports English, Hindi and Telugu. Switched to English.', 'info');
     }
 }
 
 // ============================================================================
-// ESCALATION HANDLING
-// ============================================================================
-
-function showEscalationAlert(reason) {
-    if (elements.escalationAlert) {
-        elements.escalationAlert.hidden = false;
-
-        if (elements.escalationReason) {
-            elements.escalationReason.textContent = reason;
-        }
-
-        // Add shake animation
-        elements.escalationAlert.classList.add('shake');
-        setTimeout(() => {
-            elements.escalationAlert.classList.remove('shake');
-        }, 500);
-    }
-}
-
-function hideEscalationAlert() {
-    if (elements.escalationAlert) {
-        elements.escalationAlert.hidden = true;
-    }
-}
-
-// ============================================================================
-// ERROR HANDLING
-// ============================================================================
-
-function showError(message) {
-    // Create error toast
-    const toast = document.createElement('div');
-    toast.className = 'error-toast';
-    toast.textContent = message;
-
-    document.body.appendChild(toast);
-
-    setTimeout(() => {
-        toast.classList.add('show');
-    }, 10);
-
-    setTimeout(() => {
-        toast.classList.remove('show');
-        setTimeout(() => toast.remove(), 300);
-    }, 5000);
-}
-
-// ============================================================================
-// START
-// ============================================================================
-
-document.addEventListener('DOMContentLoaded', () => {
-    init();
-    // Initialize Tabs
-    initTabs();
-});
-
-
-// ============================================================================
-// TABS & NAVIGATION
+// TABS (WAI-ARIA tabs pattern: arrow keys, Home/End)
 // ============================================================================
 
 function initTabs() {
-    const tabs = document.querySelectorAll('.nav-tab');
+    const tabs = Array.from(document.querySelectorAll('[role="tab"]'));
 
-    tabs.forEach(tab => {
-        tab.addEventListener('click', () => {
-            // Deactivate all
-            document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    function select(tab, focus = true) {
+        tabs.forEach((t) => {
+            const active = t === tab;
+            t.setAttribute('aria-selected', String(active));
+            t.tabIndex = active ? 0 : -1;
+            $(t.getAttribute('aria-controls')).hidden = !active;
+        });
+        if (focus) tab.focus();
+        if (tab.dataset.tab === 'call') callManager?.resizeCanvas();
+    }
 
-            // Activate clicked
-            tab.classList.add('active');
-            const targetId = tab.getAttribute('data-tab');
-            const targetContent = document.getElementById(`${targetId}-tab`);
-            if (targetContent) {
-                targetContent.classList.add('active');
-            }
-
-            // Special handling for AI Call tab
-            if (targetId === 'aicall') {
-                // Resize visualizer if needed
-                if (callManager && callManager.visualizer) {
-                    callManager.visualizer.resize();
-                }
+    tabs.forEach((tab, i) => {
+        tab.addEventListener('click', () => select(tab, false));
+        tab.addEventListener('keydown', (e) => {
+            let next = null;
+            if (e.key === 'ArrowRight') next = tabs[(i + 1) % tabs.length];
+            if (e.key === 'ArrowLeft') next = tabs[(i - 1 + tabs.length) % tabs.length];
+            if (e.key === 'Home') next = tabs[0];
+            if (e.key === 'End') next = tabs[tabs.length - 1];
+            if (next) {
+                e.preventDefault();
+                select(next);
             }
         });
     });
 }
 
 // ============================================================================
-// CALL MANAGER (WebSockets + Streaming)
+// LIVE CALL (WebSocket + Web Audio)
 // ============================================================================
 
 class CallManager {
     constructor() {
         this.socket = null;
         this.audioContext = null;
-        this.workletNode = null;
+        this.processor = null;
         this.mediaStream = null;
-        this.isPlaying = false;
-        this.isListening = false;
+        this.nextStartTime = 0;
+        this.available = false;
+        this.active = false;
+        this.endedByUser = false;
 
-        // UI Elements
-        this.startBtn = document.getElementById('startCallBtn');
-        this.endBtn = document.getElementById('endCallBtn');
-        this.statusText = document.getElementById('callStatusText');
-        this.latencyText = document.getElementById('callLatencyText');
+        this.startBtn = $('startCallBtn');
+        this.endBtn = $('endCallBtn');
+        this.statusText = $('callStatusText');
+        this.hint = $('callHint');
+        this.latencyText = $('callLatencyText');
         this.avatar = document.querySelector('.call-avatar');
-        this.languageSelect = document.getElementById('callLanguageSelect');
+        this.languageSelect = $('callLanguageSelect');
+        this.canvas = $('audioVisualizer');
+        this.ctx = this.canvas.getContext('2d');
 
-        // Visualizer
-        this.canvas = document.getElementById('audioVisualizer');
-        this.canvasCtx = this.canvas.getContext('2d');
-
-        this.setupEventListeners();
+        this.startBtn.addEventListener('click', () => this.startCall());
+        this.endBtn.addEventListener('click', () => this.endCall(true));
+        window.addEventListener('resize', () => this.resizeCanvas());
+        document.addEventListener('themechange', () => this.drawIdle());
+        this.resizeCanvas();
+        this.setState('idle');
     }
 
-    setupEventListeners() {
-        this.startBtn.addEventListener('click', () => this.startCall());
-        this.endBtn.addEventListener('click', () => this.endCall());
+    setAvailable(available) {
+        this.available = available;
+        if (!this.active) {
+            this.startBtn.disabled = !available;
+            if (!available) this.hint.textContent = 'Live calls are available once the speech models are ready.';
+            else if (this.statusText.dataset.tone === 'neutral') this.hint.textContent = 'Talk naturally. The assistant replies when you pause.';
+        }
+    }
+
+    setState(kind, message) {
+        const labels = {
+            idle: 'Ready to call',
+            connecting: 'Connecting…',
+            listening: 'Listening…',
+            thinking: 'Thinking…',
+            speaking: 'Apollo is speaking',
+            error: 'Call unavailable',
+        };
+        const tones = { idle: 'neutral', connecting: 'neutral', listening: 'listening', thinking: 'thinking', speaking: 'speaking', error: 'error' };
+        this.statusText.textContent = labels[kind] || kind;
+        this.statusText.dataset.tone = tones[kind] || 'neutral';
+        this.avatar.dataset.state = kind;
+        if (message !== undefined) this.hint.textContent = message;
+
+        this.active = !['idle', 'error'].includes(kind);
+        this.startBtn.disabled = this.active || !this.available;
+        this.endBtn.disabled = !this.active;
+        this.languageSelect.disabled = this.active;
+        if (!this.active) {
+            this.latencyText.textContent = 'Latency: -- ms';
+            this.drawIdle();
+        }
     }
 
     async startCall() {
-        try {
-            this.updateUI('connecting');
-
-            // 1. Initialize Audio Context
-            this.audioContext = new (window.AudioContext || window.webkitAudioContext)({
-                sampleRate: 24000,
-                latencyHint: 'interactive'
-            });
-
-            // 2. Connect WebSocket
-            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const wsUrl = `${protocol}//${window.location.host}/ws/call`;
-
-            this.socket = new WebSocket(wsUrl);
-            this.socket.binaryType = 'arraybuffer';
-
-            this.socket.onopen = () => {
-                console.log('WebSocket connected');
-                // Send initial config
-                const config = {
-                    type: 'config',
-                    language: this.languageSelect.value,
-                    sample_rate: this.audioContext.sampleRate
-                };
-                this.socket.send(JSON.stringify(config));
-                this.startMicrophone();
-            };
-
-            this.socket.onmessage = async (event) => {
-                const data = event.data;
-
-                if (typeof data === 'string') {
-                    // JSON message
-                    const msg = JSON.parse(data);
-                    this.handleSignal(msg);
-                } else if (data instanceof ArrayBuffer) {
-                    // Audio Data (PCM Int16)
-                    this.handleAudio(data);
-                }
-            };
-
-            this.socket.onclose = () => {
-                console.log('WebSocket disconnected');
-                this.endCall();
-            };
-
-            this.socket.onerror = (error) => {
-                console.error('WebSocket error:', error);
-                this.updateUI('error');
-            };
-
-        } catch (e) {
-            console.error('Failed to start call:', e);
-            this.updateUI('error');
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            this.setState('error', 'Calls need a secure page (HTTPS or localhost) and microphone support.');
+            return;
         }
-    }
+        this.endedByUser = false;
+        this.setState('connecting', 'Allow microphone access if your browser asks.');
 
-    async startMicrophone() {
         try {
             this.mediaStream = await navigator.mediaDevices.getUserMedia({
-                audio: {
-                    echoCancellation: true,
-                    noiseSuppression: true,
-                    autoGainControl: true,
-                    channelCount: 1,
-                    sampleRate: 16000
-                }
+                audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 },
             });
-
-            // Use ScriptProcessor for broad compatibility (or AudioWorklet if preferred)
-            // For this demo, ScriptProcessor is easier to bundle without external files
-            const source = this.audioContext.createMediaStreamSource(this.mediaStream);
-            const processor = this.audioContext.createScriptProcessor(4096, 1, 1);
-
-            processor.onaudioprocess = (e) => {
-                if (this.socket && this.socket.readyState === WebSocket.OPEN) {
-                    const inputData = e.inputBuffer.getChannelData(0);
-                    // Downsample to 16kHz if needed, but we requested 16kHz
-                    // Convert float32 to int16
-                    const pcmData = this.floatTo16BitPCM(inputData);
-                    this.socket.send(pcmData);
-
-                    // Visualize
-                    this.visualize(inputData);
-                }
-            };
-
-            source.connect(processor);
-            processor.connect(this.audioContext.destination); // Needed for chrome to fire events
-
-            this.updateUI('listening');
-
         } catch (e) {
-            console.error('Mic error:', e);
-            let errorMessage = 'Microphone access failed';
-
-            if (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError') {
-                errorMessage = 'Microphone permission denied. Please allow access.';
-                // Explicitly show toast or alert for permission
-                alert("Microphone permission denied. Please check your browser settings and System Privacy settings to allow microphone access.");
-            } else if (e.name === 'NotFoundError') {
-                errorMessage = 'No microphone found.';
-            }
-
-            this.statusText.textContent = errorMessage;
-            this.statusText.style.color = "var(--error-red)";
-            this.updateUI('error');
-
-            // Close socket if open since we can't send audio
-            if (this.socket) {
-                this.socket.close();
-            }
+            const denied = e && (e.name === 'NotAllowedError' || e.name === 'SecurityError');
+            this.setState(
+                'error',
+                denied
+                    ? 'Microphone access was blocked. Allow it in your browser’s site settings, then try again.'
+                    : 'No microphone was found. Connect one and try again.',
+            );
+            return;
         }
+
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        this.audioContext = new Ctx({ sampleRate: 24000, latencyHint: 'interactive' });
+
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        this.socket = new WebSocket(`${protocol}//${window.location.host}/ws/call`);
+        this.socket.binaryType = 'arraybuffer';
+
+        this.socket.onopen = () => {
+            this.socket.send(
+                JSON.stringify({ type: 'config', language: this.languageSelect.value, sample_rate: this.audioContext.sampleRate }),
+            );
+            this.startStreaming();
+        };
+        this.socket.onmessage = (event) => {
+            if (typeof event.data === 'string') this.handleSignal(JSON.parse(event.data));
+            else this.playChunk(event.data);
+        };
+        this.socket.onerror = () => {
+            this.lastError = 'The connection to the server failed.';
+        };
+        this.socket.onclose = () => {
+            const message = this.endedByUser ? 'Call ended.' : this.lastError || 'The call was disconnected.';
+            this.cleanup();
+            if (this.endedByUser) this.setState('idle', message);
+            else this.setState('error', message);
+            this.lastError = null;
+        };
+    }
+
+    startStreaming() {
+        const source = this.audioContext.createMediaStreamSource(this.mediaStream);
+        // ScriptProcessor keeps this dependency-free; AudioWorklet would need a separate module file.
+        this.processor = this.audioContext.createScriptProcessor(4096, 1, 1);
+        this.processor.onaudioprocess = (e) => {
+            if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return;
+            const input = e.inputBuffer.getChannelData(0);
+            this.socket.send(floatTo16BitPCM(input));
+            this.draw(input);
+        };
+        source.connect(this.processor);
+        this.processor.connect(this.audioContext.destination);
+        this.setState('listening', 'Talk naturally. The assistant replies when you pause.');
     }
 
     handleSignal(msg) {
-        if (msg.type === 'status') {
-            if (msg.state === 'listening') {
-                this.updateUI('listening');
-                this.avatar.classList.remove('speaking');
-            } else if (msg.state === 'speaking') {
-                this.updateUI('speaking');
-                this.avatar.classList.add('speaking');
-            } else if (msg.state === 'thinking') {
-                this.updateUI('thinking');
-            }
+        if (msg.type === 'status' && ['listening', 'thinking', 'speaking'].includes(msg.state)) {
+            this.setState(msg.state);
         } else if (msg.type === 'latency') {
-            this.latencyText.textContent = `Latency: ${msg.value}ms`;
+            this.latencyText.textContent = `Latency: ${msg.value} ms`;
+        } else if (msg.type === 'transcript' && msg.text) {
+            this.hint.textContent = `You said: “${msg.text}”`;
         } else if (msg.type === 'error') {
-            this.statusText.textContent = msg.message || 'Something went wrong';
-            this.statusText.style.color = 'var(--error-red)';
+            this.lastError = msg.message || 'Something went wrong.';
+            this.hint.textContent = this.lastError;
         }
     }
 
-    // Audio Queue for smooth playback
-    audioQueue = [];
-    nextStartTime = 0;
-
-    async handleAudio(arrayBuffer) {
-        // Play audio from server
-        // Expecting 24kHz Int16 PCM (or whatever piper outputs)
-        // We set AudioContext to 24000 in constructor
-
-        const float32 = this.int16ToFloat32(arrayBuffer);
-        const audioBuffer = this.audioContext.createBuffer(1, float32.length, 24000);
-        audioBuffer.getChannelData(0).set(float32);
-
+    playChunk(arrayBuffer) {
+        if (!this.audioContext) return;
+        const samples = int16ToFloat32(arrayBuffer);
+        const buffer = this.audioContext.createBuffer(1, samples.length, 24000);
+        buffer.getChannelData(0).set(samples);
         const source = this.audioContext.createBufferSource();
-        source.buffer = audioBuffer;
+        source.buffer = buffer;
         source.connect(this.audioContext.destination);
-
-        // Simple queueing logic
-        const currentTime = this.audioContext.currentTime;
-        if (this.nextStartTime < currentTime) {
-            this.nextStartTime = currentTime + 0.05; // Small buffer
-        }
-
+        const now = this.audioContext.currentTime;
+        if (this.nextStartTime < now) this.nextStartTime = now + 0.05;
         source.start(this.nextStartTime);
-        this.nextStartTime += audioBuffer.duration;
+        this.nextStartTime += buffer.duration;
     }
 
-    endCall() {
-        this.updateUI('disconnected');
-
-        if (this.socket) {
+    endCall(byUser = false) {
+        this.endedByUser = byUser;
+        if (this.socket && this.socket.readyState <= WebSocket.OPEN) {
             this.socket.close();
-            this.socket = null;
+        } else {
+            this.cleanup();
+            this.setState('idle', 'Call ended.');
         }
+    }
 
+    cleanup() {
+        this.socket = null;
+        if (this.processor) {
+            this.processor.disconnect();
+            this.processor.onaudioprocess = null;
+            this.processor = null;
+        }
         if (this.mediaStream) {
-            this.mediaStream.getTracks().forEach(track => track.stop());
+            this.mediaStream.getTracks().forEach((t) => t.stop());
             this.mediaStream = null;
         }
-
+        if (this.audioContext) {
+            this.audioContext.close().catch(() => {});
+            this.audioContext = null;
+        }
         this.nextStartTime = 0;
     }
 
-    updateUI(state) {
-        this.startBtn.disabled = state !== 'disconnected' && state !== 'error';
-        this.endBtn.disabled = state === 'disconnected' || state === 'error';
+    // --- visualiser ---------------------------------------------------------
 
-        switch (state) {
-            case 'connecting':
-                this.statusText.textContent = "Connecting...";
-                this.statusText.style.color = "var(--gray-600)";
-                break;
-            case 'listening':
-                this.statusText.textContent = "Listening...";
-                this.statusText.style.color = "var(--primary-blue)";
-                break;
-            case 'thinking':
-                this.statusText.textContent = "Thinking...";
-                this.statusText.style.color = "var(--warning-orange)";
-                break;
-            case 'speaking':
-                this.statusText.textContent = "Apollo Speaking";
-                this.statusText.style.color = "var(--success-green)";
-                break;
-            case 'disconnected':
-                this.statusText.textContent = "Ready to Call";
-                this.statusText.style.color = "var(--gray-800)";
-                this.avatar.classList.remove('speaking');
-                this.latencyText.textContent = "latency: --ms";
-                break;
-        }
+    resizeCanvas() {
+        const rect = this.canvas.getBoundingClientRect();
+        if (!rect.width) return;
+        const dpr = window.devicePixelRatio || 1;
+        this.canvas.width = Math.round(rect.width * dpr);
+        this.canvas.height = Math.round(rect.height * dpr);
+        this.drawIdle();
     }
 
-    floatTo16BitPCM(input) {
-        const output = new Int16Array(input.length);
-        for (let i = 0; i < input.length; i++) {
-            const s = Math.max(-1, Math.min(1, input[i]));
-            output[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
-        }
-        return output.buffer;
+    colors() {
+        const css = getComputedStyle(document.documentElement);
+        return { bg: css.getPropertyValue('--surface-2').trim(), line: css.getPropertyValue('--primary-text').trim() };
     }
 
-    int16ToFloat32(inputArrayBuffer) {
-        const int16 = new Int16Array(inputArrayBuffer);
-        const float32 = new Float32Array(int16.length);
-        for (let i = 0; i < int16.length; i++) {
-            float32[i] = int16[i] / 32768.0;
-        }
-        return float32;
+    drawIdle() {
+        this.draw(null);
     }
 
-    visualize(data) {
-        const WIDTH = this.canvas.width;
-        const HEIGHT = this.canvas.height;
-
-        this.canvasCtx.fillStyle = 'rgb(249, 250, 251)'; // gray-50
-        this.canvasCtx.fillRect(0, 0, WIDTH, HEIGHT);
-
-        this.canvasCtx.lineWidth = 2;
-        this.canvasCtx.strokeStyle = 'rgb(26, 86, 219)'; // primary-blue
-        this.canvasCtx.beginPath();
-
-        const sliceWidth = WIDTH * 1.0 / data.length;
-        let x = 0;
-
-        // Downsample for visualizer if data is too large
-        const step = Math.ceil(data.length / WIDTH);
-
-        for (let i = 0; i < data.length; i += step) {
-            const v = data[i] * 10; // Gain for visual
-            const y = (0.5 + v / 2) * HEIGHT;
-
-            if (i === 0) {
-                this.canvasCtx.moveTo(x, y);
-            } else {
-                this.canvasCtx.lineTo(x, y);
-            }
-
-            x += sliceWidth * step;
+    draw(data) {
+        const { width, height } = this.canvas;
+        if (!width) return;
+        const { bg, line } = this.colors();
+        const ctx = this.ctx;
+        ctx.fillStyle = bg;
+        ctx.fillRect(0, 0, width, height);
+        ctx.lineWidth = 2 * (window.devicePixelRatio || 1);
+        ctx.strokeStyle = line;
+        ctx.beginPath();
+        if (!data) {
+            ctx.globalAlpha = 0.4;
+            ctx.moveTo(0, height / 2);
+            ctx.lineTo(width, height / 2);
+            ctx.stroke();
+            ctx.globalAlpha = 1;
+            return;
         }
-
-        this.canvasCtx.lineTo(this.canvas.width, this.canvas.height / 2);
-        this.canvasCtx.stroke();
+        const step = Math.max(1, Math.floor(data.length / width));
+        for (let i = 0, x = 0; i < data.length; i += step, x += width / (data.length / step)) {
+            const y = (0.5 + Math.max(-1, Math.min(1, data[i] * 8)) / 2) * height;
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
     }
 }
 
-// Instantiate
-const callManager = new CallManager();
+function floatTo16BitPCM(input) {
+    const output = new Int16Array(input.length);
+    for (let i = 0; i < input.length; i++) {
+        const s = Math.max(-1, Math.min(1, input[i]));
+        output[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+    }
+    return output.buffer;
+}
+
+function int16ToFloat32(buffer) {
+    const int16 = new Int16Array(buffer);
+    const out = new Float32Array(int16.length);
+    for (let i = 0; i < int16.length; i++) out[i] = int16[i] / 32768;
+    return out;
+}
+
+// ============================================================================
+// START
+// ============================================================================
+
+let callManager = null;
+
+document.addEventListener('DOMContentLoaded', () => {
+    callManager = new CallManager();
+    initTabs();
+    setupMicButton();
+    el.uploadButton.addEventListener('click', () => el.audioUpload.click());
+    el.audioUpload.addEventListener('change', handleFileUpload);
+    el.newSessionBtn.addEventListener('click', startNewConversation);
+    el.ttsToggle.addEventListener('change', handleTtsToggle);
+
+    checkServerHealth();
+    loadEmergencyNumber();
+    initSession();
+});
